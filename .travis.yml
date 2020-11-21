@@ -1,5 +1,8 @@
-dist: bionic
 sudo: required
+language: minimal
+
+before_install:
+  - docker info
 
 install:
   - docker run --rm --privileged linuxkit/binfmt:v0.8
