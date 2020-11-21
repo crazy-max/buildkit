@@ -1,7 +1,16 @@
 sudo: required
 language: minimal
 
+services:
+  - docker
+
 before_install:
+  # update buildx
+  - mkdir -vp ~/.docker/cli-plugins/
+  - curl --silent -L "https://github.com/docker/buildx/releases/download/${BUILDX_VERSION}/buildx-${BUILDX_VERSION}.linux-amd64" > ~/.docker/cli-plugins/docker-buildx
+  - chmod a+x ~/.docker/cli-plugins/docker-buildx
+  # check
+  - sudo systemctl restart docker
   - docker info
 
 install:
@@ -23,6 +32,7 @@ jobs:
     - stage: building
       name: "Build"
       script:
+        - ./hack/validate-vendor
         - ./hack/login_ci_cache
         - ./hack/build_ci_first_pass binaries
         - ./hack/build_ci_first_pass integration-tests
