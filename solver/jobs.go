@@ -505,6 +505,9 @@ func (j *Job) Build(ctx context.Context, e Edge) (CachedResult, error) {
 		return nil, err
 	}
 	e.Vertex = v
+
+	// TODO: walk parent vtx and seek for CacheMap.ResolveResponse
+
 	return j.list.s.build(ctx, e)
 }
 

@@ -73,15 +73,20 @@ func (s *sourceOp) CacheMap(ctx context.Context, g session.Group, index int) (*s
 	}
 
 	dgst := digest.FromBytes([]byte(sourceCacheType + ":" + k))
-
 	if strings.HasPrefix(k, "session:") {
 		dgst = digest.Digest("random:" + strings.TrimPrefix(dgst.String(), dgst.Algorithm().String()+":"))
 	}
 
+	var resolveResponse map[string]string
+	if !strings.HasPrefix(s.op.Source.GetIdentifier(), "local://") {
+		resolveResponse = map[string]string{s.op.Source.GetIdentifier(): k}
+	}
+
 	return &solver.CacheMap{
 		// TODO: add os/arch
-		Digest: dgst,
-		Opts:   cacheOpts,
+		Digest:          dgst,
+		Opts:            cacheOpts,
+		ResolveResponse: resolveResponse,
 	}, done, nil
 }
 
