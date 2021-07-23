@@ -40,7 +40,7 @@ type BuildInfoType string
 
 const (
 	BuildInfoTypeImage BuildInfoType = "image"
-	BuildInfoTypeGit                 = "git"
-	BuildInfoTypeHttp                = "http"
-	BuildInfoTypeHttps               = "https"
+	BuildInfoTypeGit   BuildInfoType = "git"
+	BuildInfoTypeHTTP  BuildInfoType = "http"
+	BuildInfoTypeHTTPS BuildInfoType = "https"
 )

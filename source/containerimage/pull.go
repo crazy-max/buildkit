@@ -170,7 +170,7 @@ func mainManifestKey(ctx context.Context, desc ocispecs.Descriptor, platform oci
 	return digest.FromBytes(dt), nil
 }
 
-func (p *puller) CacheKey(ctx context.Context, g session.Group, index int) (cacheKey string, cacheOpts solver.CacheOpts, cacheDone bool, err error) {
+func (p *puller) CacheKey(ctx context.Context, g session.Group, index int) (cacheKey string, imgDigest string, cacheOpts solver.CacheOpts, cacheDone bool, err error) {
 	p.Puller.Resolver = resolver.DefaultPool.GetResolver(p.RegistryHosts, p.Ref, "pull", p.SessionManager, g).WithImageStore(p.ImageStore, p.id.ResolveMode)
 
 	// progressFactory needs the outer context, the context in `p.g.Do` will
@@ -262,7 +262,7 @@ func (p *puller) CacheKey(ctx context.Context, g session.Group, index int) (cach
 		return nil, nil
 	})
 	if err != nil {
-		return "", nil, false, err
+		return "", "", nil, false, err
 	}
 
 	cacheOpts = solver.CacheOpts(make(map[interface{}]interface{}))
@@ -272,9 +272,9 @@ func (p *puller) CacheKey(ctx context.Context, g session.Group, index int) (cach
 
 	cacheDone = index > 0
 	if index == 0 || p.configKey == "" {
-		return p.manifestKey, cacheOpts, cacheDone, nil
+		return p.manifestKey, p.manifest.MainManifestDesc.Digest.String(), cacheOpts, cacheDone, nil
 	}
-	return p.configKey, cacheOpts, cacheDone, nil
+	return p.configKey, p.manifest.MainManifestDesc.Digest.String(), cacheOpts, cacheDone, nil
 }
 
 func (p *puller) Snapshot(ctx context.Context, g session.Group) (ir cache.ImmutableRef, err error) {

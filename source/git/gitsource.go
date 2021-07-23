@@ -307,22 +307,22 @@ func (gs *gitSourceHandler) mountKnownHosts(ctx context.Context) (string, func()
 	return knownHosts.Name(), cleanup, nil
 }
 
-func (gs *gitSourceHandler) CacheKey(ctx context.Context, g session.Group, index int) (string, solver.CacheOpts, bool, error) {
+func (gs *gitSourceHandler) CacheKey(ctx context.Context, g session.Group, index int) (string, string, solver.CacheOpts, bool, error) {
 	remote := gs.src.Remote
 	gs.locker.Lock(remote)
 	defer gs.locker.Unlock(remote)
 
 	if ref := gs.src.Ref; ref != "" && isCommitSHA(ref) {
-		ref = gs.shaToCacheKey(ref)
-		gs.cacheKey = ref
-		return ref, nil, true, nil
+		cacheKey := gs.shaToCacheKey(ref)
+		gs.cacheKey = cacheKey
+		return cacheKey, ref, nil, true, nil
 	}
 
 	gs.getAuthToken(ctx, g)
 
 	gitDir, unmountGitDir, err := gs.mountRemote(ctx, remote, gs.auth, g)
 	if err != nil {
-		return "", nil, false, err
+		return "", "", nil, false, err
 	}
 	defer unmountGitDir()
 
@@ -331,7 +331,7 @@ func (gs *gitSourceHandler) CacheKey(ctx context.Context, g session.Group, index
 		var unmountSock func() error
 		sock, unmountSock, err = gs.mountSSHAuthSock(ctx, gs.src.MountSSHSock, g)
 		if err != nil {
-			return "", nil, false, err
+			return "", "", nil, false, err
 		}
 		defer unmountSock()
 	}
@@ -341,7 +341,7 @@ func (gs *gitSourceHandler) CacheKey(ctx context.Context, g session.Group, index
 		var unmountKnownHosts func() error
 		knownHosts, unmountKnownHosts, err = gs.mountKnownHosts(ctx)
 		if err != nil {
-			return "", nil, false, err
+			return "", "", nil, false, err
 		}
 		defer unmountKnownHosts()
 	}
@@ -350,7 +350,7 @@ func (gs *gitSourceHandler) CacheKey(ctx context.Context, g session.Group, index
 	if ref == "" {
 		ref, err = getDefaultBranch(ctx, gitDir, "", sock, knownHosts, gs.auth, gs.src.Remote)
 		if err != nil {
-			return "", nil, false, err
+			return "", "", nil, false, err
 		}
 	}
 
@@ -358,28 +358,28 @@ func (gs *gitSourceHandler) CacheKey(ctx context.Context, g session.Group, index
 
 	buf, err := gitWithinDir(ctx, gitDir, "", sock, knownHosts, gs.auth, "ls-remote", "origin", ref)
 	if err != nil {
-		return "", nil, false, errors.Wrapf(err, "failed to fetch remote %s", redactCredentials(remote))
+		return "", "", nil, false, errors.Wrapf(err, "failed to fetch remote %s", redactCredentials(remote))
 	}
 	out := buf.String()
 	idx := strings.Index(out, "\t")
 	if idx == -1 {
-		return "", nil, false, errors.Errorf("repository does not contain ref %s, output: %q", ref, string(out))
+		return "", "", nil, false, errors.Errorf("repository does not contain ref %s, output: %q", ref, string(out))
 	}
 
 	sha := string(out[:idx])
 	if !isCommitSHA(sha) {
-		return "", nil, false, errors.Errorf("invalid commit sha %q", sha)
+		return "", "", nil, false, errors.Errorf("invalid commit sha %q", sha)
 	}
-	sha = gs.shaToCacheKey(sha)
-	gs.cacheKey = sha
-	return sha, nil, true, nil
+	cacheKey := gs.shaToCacheKey(sha)
+	gs.cacheKey = cacheKey
+	return cacheKey, sha, nil, true, nil
 }
 
 func (gs *gitSourceHandler) Snapshot(ctx context.Context, g session.Group) (out cache.ImmutableRef, retErr error) {
 	cacheKey := gs.cacheKey
 	if cacheKey == "" {
 		var err error
-		cacheKey, _, _, err = gs.CacheKey(ctx, g, 0)
+		cacheKey, _, _, _, err = gs.CacheKey(ctx, g, 0)
 		if err != nil {
 			return nil, err
 		}

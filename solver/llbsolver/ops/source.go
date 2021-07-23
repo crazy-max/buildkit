@@ -67,7 +67,8 @@ func (s *sourceOp) CacheMap(ctx context.Context, g session.Group, index int) (*s
 	if err != nil {
 		return nil, false, err
 	}
-	k, cacheOpts, done, err := src.CacheKey(ctx, g, index)
+
+	k, srcDigest, cacheOpts, done, err := src.CacheKey(ctx, g, index)
 	if err != nil {
 		return nil, false, err
 	}
@@ -79,7 +80,7 @@ func (s *sourceOp) CacheMap(ctx context.Context, g session.Group, index int) (*s
 
 	var resolveResponse map[string]string
 	if !strings.HasPrefix(s.op.Source.GetIdentifier(), "local://") {
-		resolveResponse = map[string]string{s.op.Source.GetIdentifier(): k}
+		resolveResponse = map[string]string{s.op.Source.GetIdentifier(): srcDigest}
 	}
 
 	return &solver.CacheMap{
