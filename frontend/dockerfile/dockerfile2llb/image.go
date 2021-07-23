@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/docker/docker/api/types/strslice"
-	"github.com/moby/buildkit/source"
 	"github.com/moby/buildkit/util/system"
 	ocispecs "github.com/opencontainers/image-spec/specs-go/v1"
 )
@@ -56,7 +55,7 @@ type Image struct {
 	Variant string `json:"variant,omitempty"`
 
 	// BuildInfo defines build dependencies
-	BuildInfo source.BuildInfo `json:"moby.buildkit.buildinfo.v0,omitempty"`
+	BuildInfo []byte `json:"moby.buildkit.buildinfo.v0,omitempty"`
 }
 
 func clone(src Image) Image {

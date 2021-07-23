@@ -19,11 +19,11 @@ import (
 	"github.com/docker/go-connections/nat"
 	"github.com/moby/buildkit/client/llb"
 	"github.com/moby/buildkit/client/llb/imagemetaresolver"
+	"github.com/moby/buildkit/exporter/containerimage/exptypes"
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 	"github.com/moby/buildkit/frontend/dockerfile/parser"
 	"github.com/moby/buildkit/frontend/dockerfile/shell"
 	"github.com/moby/buildkit/solver/pb"
-	"github.com/moby/buildkit/source"
 	"github.com/moby/buildkit/util/apicaps"
 	"github.com/moby/buildkit/util/suggest"
 	"github.com/moby/buildkit/util/system"
@@ -295,11 +295,14 @@ func Dockerfile2LLB(ctx context.Context, dt []byte, opt ConvertOpt) (*llb.State,
 							}
 						}
 						if !isScratch {
-							img.BuildInfo = source.BuildInfo{
-								Type:  source.BuildInfoTypeImage,
+							img.BuildInfo, err = json.Marshal(exptypes.BuildInfo{
+								Type:  exptypes.BuildInfoTypeImage,
 								Ref:   origName,
 								Alias: ref.String(),
 								Pin:   dgst.String(),
+							})
+							if err != nil {
+								return err
 							}
 						}
 						d.image = img

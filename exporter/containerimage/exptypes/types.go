@@ -24,3 +24,23 @@ type Platform struct {
 	ID       string
 	Platform ocispecs.Platform
 }
+
+type BuildInfos struct {
+	BuildInfos []BuildInfo
+}
+
+type BuildInfo struct {
+	Type  BuildInfoType `json:"type,omitempty"`
+	Ref   string        `json:"ref,omitempty"`
+	Alias string        `json:"alias,omitempty"`
+	Pin   string        `json:"pin,omitempty"`
+}
+
+type BuildInfoType string
+
+const (
+	BuildInfoTypeImage BuildInfoType = "image"
+	BuildInfoTypeGit                 = "git"
+	BuildInfoTypeHttp                = "http"
+	BuildInfoTypeHttps               = "https"
+)
