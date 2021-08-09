@@ -191,8 +191,8 @@ type CacheMap struct {
 	// the cache. Opts should not have any impact on the computed cache key.
 	Opts CacheOpts
 
-	// ResolveResponse ...
-	ResolveResponse map[string]string
+	// BuildInfos ...
+	BuildInfos CacheBuildInfos
 }
 
 // ExportableCacheKey is a cache key connected with an exporter that can export

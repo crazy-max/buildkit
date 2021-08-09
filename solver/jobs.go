@@ -506,9 +506,22 @@ func (j *Job) Build(ctx context.Context, e Edge) (CachedResult, error) {
 	}
 	e.Vertex = v
 
-	// TODO: walk parent vtx and seek for CacheMap.ResolveResponse
+	res, err := j.list.s.build(ctx, e)
+	if err != nil {
+		return nil, err
+	}
 
-	return j.list.s.build(ctx, e)
+	if biGetter := CacheBuildInfoGetterOf(ctx); biGetter != nil {
+		var keys []interface{}
+		for _, ckey := range res.CacheKeys() {
+			keys = append(keys, ckey.digest)
+		}
+		for _, v := range biGetter(keys...) {
+			fmt.Printf("biGetter %+v\n", v)
+		}
+	}
+
+	return res, err
 }
 
 func (j *Job) Discard() error {
@@ -759,6 +772,7 @@ func (s *sharedOp) CacheMap(ctx context.Context, index int) (resp *cacheMapResp,
 			}
 			s.cacheErr = err
 		}
+		ctx = withAncestorCacheBuildInfos(ctx, s.st)
 		return s.cacheRes, err
 	})
 	if err != nil {
