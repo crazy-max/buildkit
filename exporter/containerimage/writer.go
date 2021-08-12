@@ -391,9 +391,10 @@ func patchImageConfig(dt []byte, descs []ocispecs.Descriptor, history []ocispecs
 		m["moby.buildkit.cache.v0"] = dt
 	}
 
-	if _, ok := m["moby.buildkit.buildinfo.v0"]; ok {
-		// TODO: patch build info
-	}
+	// TODO: patch build info
+	//if _, ok := m["moby.buildkit.buildinfo.v0"]; ok {
+	//
+	//}
 
 	dt, err = json.Marshal(m)
 	return dt, errors.Wrap(err, "failed to marshal config after patch")

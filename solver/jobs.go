@@ -511,17 +511,30 @@ func (j *Job) Build(ctx context.Context, e Edge) (CachedResult, error) {
 		return nil, err
 	}
 
-	if biGetter := CacheBuildInfoGetterOf(ctx); biGetter != nil {
-		var keys []interface{}
-		for _, ckey := range res.CacheKeys() {
-			keys = append(keys, ckey.digest)
-		}
-		for _, v := range biGetter(keys...) {
-			fmt.Printf("biGetter %+v\n", v)
-		}
-	}
+	// TODO: returned out build info
+	_ = j.list.mergeBuildInfo(j)
 
-	return res, err
+	return res, nil
+}
+
+func (jl *Solver) mergeBuildInfo(j *Job) map[string]string {
+	jl.mu.Lock()
+	defer jl.mu.Unlock()
+	bi := make(map[string]string)
+	for _, st := range jl.actives {
+		st.mu.Lock()
+		if _, ok := st.jobs[j]; ok {
+			for _, cres := range st.op.cacheRes {
+				for key, val := range cres.BuildInfos {
+					if _, okk := bi[key]; !okk {
+						bi[key] = val
+					}
+				}
+			}
+		}
+		st.mu.Unlock()
+	}
+	return bi
 }
 
 func (j *Job) Discard() error {
@@ -772,7 +785,6 @@ func (s *sharedOp) CacheMap(ctx context.Context, index int) (resp *cacheMapResp,
 			}
 			s.cacheErr = err
 		}
-		ctx = withAncestorCacheBuildInfos(ctx, s.st)
 		return s.cacheRes, err
 	})
 	if err != nil {
