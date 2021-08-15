@@ -22,7 +22,7 @@ import (
 type ResolveOpFunc func(Vertex, Builder) (Op, error)
 
 type Builder interface {
-	Build(ctx context.Context, e Edge) (CachedResult, error)
+	Build(ctx context.Context, e Edge) (CachedResult, BuildInfoResult, error)
 	InContext(ctx context.Context, f func(ctx context.Context, g session.Group) error) error
 	EachValue(ctx context.Context, key string, fn func(interface{}) error) error
 }
@@ -197,15 +197,16 @@ type subBuilder struct {
 	exporters []ExportableCacheKey
 }
 
-func (sb *subBuilder) Build(ctx context.Context, e Edge) (CachedResult, error) {
+func (sb *subBuilder) Build(ctx context.Context, e Edge) (CachedResult, BuildInfoResult, error) {
+	// TODO: Handle BuildInfoResult from subbuild
 	res, err := sb.solver.subBuild(ctx, e, sb.vtx)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	sb.mu.Lock()
 	sb.exporters = append(sb.exporters, res.CacheKeys()[0]) // all keys already have full export chain
 	sb.mu.Unlock()
-	return res, nil
+	return res, nil, nil
 }
 
 func (sb *subBuilder) InContext(ctx context.Context, f func(context.Context, session.Group) error) error {
@@ -495,38 +496,36 @@ func (jl *Solver) deleteIfUnreferenced(k digest.Digest, st *state) {
 	}
 }
 
-func (j *Job) Build(ctx context.Context, e Edge) (CachedResult, error) {
+func (j *Job) Build(ctx context.Context, e Edge) (CachedResult, BuildInfoResult, error) {
 	if span := trace.SpanFromContext(ctx); span.SpanContext().IsValid() {
 		j.span = span
 	}
 
 	v, err := j.list.load(e.Vertex, nil, j)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	e.Vertex = v
 
 	res, err := j.list.s.build(ctx, e)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	// TODO: returned out build info
-	_ = j.list.mergeBuildInfo(j)
-
-	return res, nil
+	return res, j.mergeBuildInfo(ctx, e), nil
 }
 
-func (jl *Solver) mergeBuildInfo(j *Job) map[string]string {
-	jl.mu.Lock()
-	defer jl.mu.Unlock()
-	bi := make(map[string]string)
-	for _, st := range jl.actives {
+func (j *Job) mergeBuildInfo(ctx context.Context, e Edge) BuildInfoResult {
+	j.list.mu.Lock()
+	defer j.list.mu.Unlock()
+	bi := make(BuildInfoResult)
+	// FIXME: Walking should start from e
+	for _, st := range j.list.actives {
 		st.mu.Lock()
 		if _, ok := st.jobs[j]; ok {
-			for _, cres := range st.op.cacheRes {
-				for key, val := range cres.BuildInfos {
-					if _, okk := bi[key]; !okk {
+			for _, cacheRes := range st.op.cacheRes {
+				for key, val := range cacheRes.BuildInfo {
+					if _, ok := bi[key]; !ok {
 						bi[key] = val
 					}
 				}

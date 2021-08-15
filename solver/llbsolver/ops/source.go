@@ -78,16 +78,16 @@ func (s *sourceOp) CacheMap(ctx context.Context, g session.Group, index int) (*s
 		dgst = digest.Digest("random:" + strings.TrimPrefix(dgst.String(), dgst.Algorithm().String()+":"))
 	}
 
-	var buildInfos map[string]string
+	var buildInfo map[string]string
 	if !strings.HasPrefix(s.op.Source.GetIdentifier(), "local://") {
-		buildInfos = map[string]string{s.op.Source.GetIdentifier(): srcDigest}
+		buildInfo = map[string]string{s.op.Source.GetIdentifier(): srcDigest}
 	}
 
 	return &solver.CacheMap{
 		// TODO: add os/arch
-		Digest:     dgst,
-		Opts:       cacheOpts,
-		BuildInfos: buildInfos,
+		Digest:    dgst,
+		Opts:      cacheOpts,
+		BuildInfo: buildInfo,
 	}, done, nil
 }
 
