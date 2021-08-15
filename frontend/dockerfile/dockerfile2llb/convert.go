@@ -295,15 +295,12 @@ func Dockerfile2LLB(ctx context.Context, dt []byte, opt ConvertOpt) (*llb.State,
 							}
 						}
 						if !isScratch {
-							img.BuildInfo, err = json.Marshal(exptypes.BuildInfo{
+							img.BuildInfo, _ = json.Marshal(exptypes.BuildInfo{
 								Type:  exptypes.BuildInfoTypeImage,
 								Ref:   origName,
 								Alias: ref.String(),
 								Pin:   dgst.String(),
 							})
-							if err != nil {
-								return err
-							}
 						}
 						d.image = img
 					}
@@ -331,11 +328,22 @@ func Dockerfile2LLB(ctx context.Context, dt []byte, opt ConvertOpt) (*llb.State,
 
 	buildContext := &mutableOutput{}
 	ctxPaths := map[string]struct{}{}
+	var buildInfos []exptypes.BuildInfo
 
 	for _, d := range allDispatchStates.states {
 		if !isReachable(target, d) {
 			continue
 		}
+
+		// Collect build dependencies
+		if len(d.image.BuildInfo) > 0 {
+			var bi exptypes.BuildInfo
+			if err = json.Unmarshal(d.image.BuildInfo, &bi); err != nil {
+				return nil, nil, err
+			}
+			buildInfos = append(buildInfos, bi)
+		}
+
 		if d.base != nil {
 			d.state = d.base.state
 			d.platform = d.base.platform
@@ -404,6 +412,15 @@ func Dockerfile2LLB(ctx context.Context, dt []byte, opt ConvertOpt) (*llb.State,
 
 		for p := range d.ctxPaths {
 			ctxPaths[p] = struct{}{}
+		}
+	}
+
+	// Set target with gathered build dependencies
+	target.image.BuildInfo = []byte{}
+	if len(buildInfos) > 0 {
+		target.image.BuildInfo, err = json.Marshal(buildInfos)
+		if err != nil {
+			return nil, nil, err
 		}
 	}
 
