@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -363,6 +364,9 @@ func patchBuildInfo(ctx context.Context, res solver.ResultProxy, dtic []byte) ([
 	for _, bi := range mbis {
 		bis = append(bis, bi)
 	}
+	sort.Slice(bis, func(i, j int) bool {
+		return bis[i].Ref < bis[j].Ref
+	})
 
 	return json.Marshal(map[string][]exptypes.BuildInfo{
 		"sources": bis,
