@@ -3687,15 +3687,15 @@ func (v *vertexSubBuild) Sys() interface{} {
 	return v
 }
 
-func (v *vertexSubBuild) Exec(ctx context.Context, g session.Group, inputs []Result) (outputs []Result, bi map[string]string, err error) {
+func (v *vertexSubBuild) Exec(ctx context.Context, g session.Group, inputs []Result) (outputs []Result, err error) {
 	if err := v.exec(ctx, inputs); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-	res, bi, err := v.b.Build(ctx, v.g)
+	res, _, err := v.b.Build(ctx, v.g)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-	return []Result{res}, bi, nil
+	return []Result{res}, nil
 }
 
 func (v *vertexSubBuild) Acquire(ctx context.Context) (ReleaseFunc, error) {

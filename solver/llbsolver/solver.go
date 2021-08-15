@@ -2,10 +2,13 @@ package llbsolver
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
 
+	"github.com/docker/distribution/reference"
 	"github.com/moby/buildkit/cache"
 	"github.com/moby/buildkit/cache/remotecache"
 	"github.com/moby/buildkit/client"
@@ -16,6 +19,8 @@ import (
 	"github.com/moby/buildkit/frontend/gateway"
 	"github.com/moby/buildkit/session"
 	"github.com/moby/buildkit/solver"
+	"github.com/moby/buildkit/source"
+	"github.com/moby/buildkit/util/bklog"
 	"github.com/moby/buildkit/util/compression"
 	"github.com/moby/buildkit/util/entitlements"
 	"github.com/moby/buildkit/util/progress"
@@ -173,12 +178,20 @@ func (s *Solver) Solve(ctx context.Context, id string, sessionID string, req fro
 			}
 			inp.Ref = workerRef.ImmutableRef
 
-			dt, err := inlineCache(ctx, exp.CacheExporter, r, session.NewGroup(sessionID))
+			dtbi, err := patchBuildInfo(ctx, res, inp.Metadata[exptypes.ExporterImageConfigKey])
 			if err != nil {
 				return nil, err
 			}
-			if dt != nil {
-				inp.Metadata[exptypes.ExporterInlineCache] = dt
+			if dtbi != nil && len(dtbi) > 0 {
+				inp.Metadata[exptypes.ExporterBuildInfo] = dtbi
+			}
+
+			dtic, err := inlineCache(ctx, exp.CacheExporter, r, session.NewGroup(sessionID))
+			if err != nil {
+				return nil, err
+			}
+			if dtic != nil {
+				inp.Metadata[exptypes.ExporterInlineCache] = dtic
 			}
 		}
 		if res.Refs != nil {
@@ -197,12 +210,20 @@ func (s *Solver) Solve(ctx context.Context, id string, sessionID string, req fro
 					}
 					m[k] = workerRef.ImmutableRef
 
-					dt, err := inlineCache(ctx, exp.CacheExporter, r, session.NewGroup(sessionID))
+					dtbi, err := patchBuildInfo(ctx, res, inp.Metadata[fmt.Sprintf("%s/%s", exptypes.ExporterImageConfigKey, k)])
 					if err != nil {
 						return nil, err
 					}
-					if dt != nil {
-						inp.Metadata[fmt.Sprintf("%s/%s", exptypes.ExporterInlineCache, k)] = dt
+					if dtbi != nil && len(dtbi) > 0 {
+						inp.Metadata[fmt.Sprintf("%s/%s", exptypes.ExporterBuildInfo, k)] = dtbi
+					}
+
+					dtic, err := inlineCache(ctx, exp.CacheExporter, r, session.NewGroup(sessionID))
+					if err != nil {
+						return nil, err
+					}
+					if dtic != nil {
+						inp.Metadata[fmt.Sprintf("%s/%s", exptypes.ExporterInlineCache, k)] = dtic
 					}
 				}
 			}
@@ -253,6 +274,9 @@ func (s *Solver) Solve(ctx context.Context, id string, sessionID string, req fro
 		if strings.HasPrefix(k, "frontend.") {
 			exporterResponse[k] = string(v)
 		}
+		if strings.HasPrefix(k, exptypes.ExporterBuildInfo) {
+			exporterResponse[k] = base64.StdEncoding.EncodeToString(v)
+		}
 	}
 	for k, v := range cacheExporterResponse {
 		if strings.HasPrefix(k, "cache.") {
@@ -263,6 +287,101 @@ func (s *Solver) Solve(ctx context.Context, id string, sessionID string, req fro
 	return &client.SolveResponse{
 		ExporterResponse: exporterResponse,
 	}, nil
+}
+
+// patchBuildInfo fixes and solved build info from image config
+// moby.buildkit.buildinfo.v0
+func patchBuildInfo(ctx context.Context, res solver.ResultProxy, dtic []byte) ([]byte, error) {
+	icbi, err := imageConfigBuildInfo(dtic)
+	if err != nil {
+		bklog.G(ctx).Error(err)
+	}
+
+	// Iterate and patch build sources
+	mbis := map[string]exptypes.BuildInfo{}
+	for srcs, di := range res.BuildInfo() {
+		src, err := source.FromString(srcs)
+		if err != nil {
+			return nil, err
+		}
+		if sid, ok := src.(*source.ImageIdentifier); ok {
+			for _, bi := range icbi {
+				// Use original user input from image config
+				if bi.Type == source.DockerImageScheme && bi.Alias == sid.Reference.String() {
+					if _, ok := mbis[bi.Alias]; !ok {
+						parsed, err := reference.ParseNormalizedNamed(bi.Ref)
+						if err != nil {
+							return nil, errors.Wrapf(err, "failed to parse %s", bi.Ref)
+						}
+						mbis[bi.Alias] = exptypes.BuildInfo{
+							Type: source.DockerImageScheme,
+							Ref:  reference.TagNameOnly(parsed).String(),
+							Pin:  di,
+						}
+					}
+					break
+				}
+			}
+			if _, ok := mbis[sid.Reference.String()]; !ok {
+				mbis[sid.Reference.String()] = exptypes.BuildInfo{
+					Type: source.DockerImageScheme,
+					Ref:  sid.Reference.String(),
+					Pin:  di,
+				}
+			}
+		} else if sid, ok := src.(*source.GitIdentifier); ok {
+			sref := sid.Remote
+			if len(sid.Ref) > 0 {
+				sref += "#" + sid.Ref
+			}
+			if len(sid.Subdir) > 0 {
+				sref += ":" + sid.Subdir
+			}
+			if _, ok := mbis[sref]; !ok {
+				mbis[sref] = exptypes.BuildInfo{
+					Type: source.GitScheme,
+					Ref:  sref,
+					Pin:  di,
+				}
+			}
+		} else if sid, ok := src.(*source.HTTPIdentifier); ok {
+			stype := source.HTTPScheme
+			if sid.TLS {
+				stype = source.HTTPSScheme
+			}
+			if _, ok := mbis[sid.URL]; !ok {
+				mbis[sid.URL] = exptypes.BuildInfo{
+					Type: exptypes.BuildInfoType(stype),
+					Ref:  sid.URL,
+					Pin:  di,
+				}
+			}
+		}
+	}
+
+	bis := make([]exptypes.BuildInfo, 0, len(mbis))
+	for _, bi := range mbis {
+		bis = append(bis, bi)
+	}
+
+	return json.Marshal(map[string][]exptypes.BuildInfo{
+		"sources": bis,
+	})
+}
+
+// imageConfigBuildInfo returns build dependencies from image config
+func imageConfigBuildInfo(dtic []byte) (bi []exptypes.BuildInfo, err error) {
+	if len(dtic) == 0 {
+		return
+	}
+	var ic map[string][]byte
+	_ = json.Unmarshal(dtic, &ic)
+	if dtbi, ok := ic["moby.buildkit.buildinfo.v0"]; ok {
+		if err = json.Unmarshal(dtbi, &bi); err != nil {
+			return nil, fmt.Errorf("cannot unmarshal moby.buildkit.buildinfo.v0: %v", err)
+		}
+	}
+	return
 }
 
 func inlineCache(ctx context.Context, e remotecache.Exporter, res solver.CachedResult, g session.Group) ([]byte, error) {

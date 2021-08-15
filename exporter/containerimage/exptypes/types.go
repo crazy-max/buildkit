@@ -11,6 +11,7 @@ const (
 	ExporterImageConfigKey       = "containerimage.config"
 	ExporterImageConfigDigestKey = "containerimage.config.digest"
 	ExporterInlineCache          = "containerimage.inlinecache"
+	ExporterBuildInfo            = "containerimage.buildinfo"
 	ExporterPlatformsKey         = "refs.platforms"
 )
 
@@ -25,10 +26,6 @@ type Platform struct {
 	Platform ocispecs.Platform
 }
 
-type BuildInfos struct {
-	BuildInfos []BuildInfo
-}
-
 type BuildInfo struct {
 	Type  BuildInfoType `json:"type,omitempty"`
 	Ref   string        `json:"ref,omitempty"`
@@ -39,7 +36,7 @@ type BuildInfo struct {
 type BuildInfoType string
 
 const (
-	BuildInfoTypeImage BuildInfoType = "image"
+	BuildInfoTypeImage BuildInfoType = "docker-image"
 	BuildInfoTypeGit   BuildInfoType = "git"
 	BuildInfoTypeHTTP  BuildInfoType = "http"
 	BuildInfoTypeHTTPS BuildInfoType = "https"
