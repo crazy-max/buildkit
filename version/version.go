@@ -23,7 +23,7 @@ import (
 )
 
 const (
-	defaultVersion = "0.0.0+unknown"
+	DefaultVersion = "0.0.0+unknown"
 )
 
 var (
@@ -31,7 +31,7 @@ var (
 	Package = "github.com/moby/buildkit"
 
 	// Version holds the complete version number. Filled in at linking time.
-	Version = defaultVersion
+	Version = DefaultVersion
 
 	// Revision is filled with the VCS (e.g. git) revision being used to build
 	// the program at linking time.
@@ -45,7 +45,7 @@ var (
 )
 
 func UserAgent() string {
-	version := defaultVersion
+	version := DefaultVersion
 
 	reOnce.Do(func() {
 		reRelease = regexp.MustCompile(`^(v[0-9]+\.[0-9]+)\.[0-9]+$`)

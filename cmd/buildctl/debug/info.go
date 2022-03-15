@@ -15,6 +15,8 @@ var InfoCommand = cli.Command{
 	Action: info,
 }
 
+const defaultPfx = "  "
+
 func info(clicontext *cli.Context) error {
 	c, err := bccommon.ResolveClient(clicontext)
 	if err != nil {
@@ -24,7 +26,18 @@ func info(clicontext *cli.Context) error {
 	if err != nil {
 		return err
 	}
+
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
-	_, _ = fmt.Fprintf(w, "BuildKit:\t%s %s %s\n", res.BuildkitPackage, res.BuildkitVersion, res.BuildkitRevision)
+
+	_, _ = fmt.Fprintf(w, "BuildKit:\t\n")
+	_, _ = fmt.Fprintf(w, "%sPackage:\t%s\n", defaultPfx, res.BuildkitPackage)
+	_, _ = fmt.Fprintf(w, "%sVersion:\t%s\n", defaultPfx, res.BuildkitVersion)
+	_, _ = fmt.Fprintf(w, "%sRevision:\t%s\n", defaultPfx, res.BuildkitRevision)
+	_ = w.Flush()
+
+	_, _ = fmt.Fprintf(w, "\t\n")
+	_, _ = fmt.Fprintf(w, "Built-in Dockerfile Frontend:\t\n")
+	_, _ = fmt.Fprintf(w, "%sVersion:\t%s\n", defaultPfx, res.DockerfileFrontendVersion)
+
 	return w.Flush()
 }

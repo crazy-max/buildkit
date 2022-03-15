@@ -8,9 +8,10 @@ import (
 )
 
 type InfoResponse struct {
-	BuildkitPackage  string
-	BuildkitVersion  string
-	BuildkitRevision string
+	BuildkitPackage           string
+	BuildkitVersion           string
+	BuildkitRevision          string
+	DockerfileFrontendVersion string
 }
 
 func (c *Client) Info(ctx context.Context) (*InfoResponse, error) {
@@ -19,8 +20,9 @@ func (c *Client) Info(ctx context.Context) (*InfoResponse, error) {
 		return nil, errors.Wrap(err, "failed to call info")
 	}
 	return &InfoResponse{
-		BuildkitPackage:  res.BuildkitPackage,
-		BuildkitVersion:  res.BuildkitVersion,
-		BuildkitRevision: res.BuildkitRevision,
+		BuildkitPackage:           res.BuildkitPackage,
+		BuildkitVersion:           res.BuildkitVersion,
+		BuildkitRevision:          res.BuildkitRevision,
+		DockerfileFrontendVersion: res.DockerfileFrontendVersion,
 	}, nil
 }

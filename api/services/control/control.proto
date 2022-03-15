@@ -165,4 +165,5 @@ message InfoResponse {
 	string buildkitPackage = 1;
 	string buildkitVersion = 2;
 	string buildkitRevision = 3;
+	string dockerfileFrontendVersion = 4;
 }

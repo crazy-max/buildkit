@@ -13,6 +13,7 @@ import (
 	controlgateway "github.com/moby/buildkit/control/gateway"
 	"github.com/moby/buildkit/exporter"
 	"github.com/moby/buildkit/frontend"
+	frontendrelease "github.com/moby/buildkit/frontend/dockerfile/release"
 	"github.com/moby/buildkit/session"
 	"github.com/moby/buildkit/session/grpchijack"
 	"github.com/moby/buildkit/solver"
@@ -436,10 +437,15 @@ func (c *Controller) ListWorkers(ctx context.Context, r *controlapi.ListWorkersR
 }
 
 func (c *Controller) Info(ctx context.Context, r *controlapi.InfoRequest) (*controlapi.InfoResponse, error) {
+	frontendver, err := frontendrelease.FrontendVersion()
+	if err != nil {
+		return nil, err
+	}
 	return &controlapi.InfoResponse{
-		BuildkitPackage:  version.Package,
-		BuildkitVersion:  version.Version,
-		BuildkitRevision: version.Revision,
+		BuildkitPackage:           version.Package,
+		BuildkitVersion:           version.Version,
+		BuildkitRevision:          version.Revision,
+		DockerfileFrontendVersion: frontendver,
 	}, nil
 }
 

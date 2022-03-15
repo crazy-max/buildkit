@@ -3,6 +3,7 @@ module github.com/moby/buildkit
 go 1.17
 
 require (
+	github.com/Masterminds/semver/v3 v3.1.1
 	github.com/Microsoft/go-winio v0.5.1
 	github.com/Microsoft/hcsshim v0.9.2
 	github.com/agext/levenshtein v1.2.3
