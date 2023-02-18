@@ -19,20 +19,62 @@ env:
   SETUP_BUILDKIT_IMAGE: "moby/buildkit:latest"
 
 jobs:
-  validate:
+  list-commits:
     runs-on: ubuntu-20.04
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - script: ./hack/lint
-          - script: ./hack/validate-vendor
-          - script: ./hack/validate-generated-files
-          - script: ./hack/validate-shfmt
+    outputs:
+      commits: ${{ steps.commits.outputs.matrix }}
     steps:
       -
         name: Checkout
         uses: actions/checkout@v3
+      -
+        name: Dump context
+        uses: crazy-max/ghaction-dump-context@v1
+      -
+        name: List commits
+        id: commits
+        uses: actions/github-script@v6
+        with:
+          script: |
+            let matrix = [];
+            core.info(`context.eventName: ${context.eventName}`);
+            if (context.eventName != 'pull_request') {
+              core.info('Not a pull request, skipping');
+              matrix.push('');
+            } else {
+              await core.group(`Retrieving commits for PR ${context.issue.number}`, async () => {
+                const commits = await github.paginate(github.rest.pulls.listCommits.endpoint.merge({
+                  ...context.repo,
+                  pull_number: context.issue.number,
+                }));
+                for (const { sha, commit: { message } } of commits) {
+                  core.info(`${sha}`);
+                  matrix.push(sha);
+                }
+              });
+            }
+            core.info(`matrix: ${JSON.stringify(matrix)}`);
+            core.setOutput('matrix', JSON.stringify(matrix));
+
+  validate:
+    runs-on: ubuntu-20.04
+    needs:
+      - list-commits
+    strategy:
+      fail-fast: false
+      matrix:
+        commit: ${{ fromJson(needs.list-commits.outputs.commits) }}
+        script:
+          - ./hack/lint
+          - ./hack/validate-vendor
+          - ./hack/validate-generated-files
+          - ./hack/validate-shfmt
+    steps:
+      -
+        name: Checkout
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ matrix.commit }}
       -
         name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
@@ -44,3 +86,31 @@ jobs:
         name: Run
         run: |
           ${{ matrix.script }}
+
+  build:
+    runs-on: ubuntu-20.04
+    needs:
+      - list-commits
+    strategy:
+      fail-fast: false
+      matrix:
+        commit: ${{ fromJson(needs.list-commits.outputs.commits) }}
+    steps:
+      -
+        name: Checkout
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ matrix.commit }}
+      -
+        name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+        with:
+          version: ${{ env.BUILDX_VERSION }}
+          driver-opts: image=${{ env.REPO_SLUG_ORIGIN }}
+          buildkitd-flags: --debug
+      -
+        name: Build
+        uses: docker/build-push-action@v4
+        with:
+          target: buildkit
+          outputs: type=cacheonly

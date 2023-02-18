@@ -273,6 +273,10 @@ If credentials are required, `buildctl` will attempt to read Docker configuratio
 
 #### Local directory
 
+foo
+
+bar
+
 The local client will copy the files directly to the client. This is useful if BuildKit is being used for building something else than container images.
 
 ```bash
