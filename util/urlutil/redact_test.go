@@ -10,7 +10,7 @@ func TestRedactCredentials(t *testing.T) {
 	}{
 		{
 			name: "non-blank Password",
-			url:  "https://user:password@host.tld/this:that",
+			url:  "https://user:password@host.tld/qdsqsqsqthis:that",
 			want: "https://xxxxx:xxxxx@host.tld/this:that",
 		},
 		{

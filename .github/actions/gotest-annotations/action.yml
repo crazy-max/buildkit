@@ -2,7 +2,7 @@ name: 'Go test annotations'
 description: 'Annotates failed tests'
 
 inputs:
-  dir:
+  directory:
     description: 'Test reports dir'
     required: true
 
@@ -24,7 +24,7 @@ runs:
           const failedTestsRegex = /(\s*[\w\d]+_test.go:\d+:)(.*?)(Test:\s+Test[\w\d]*?\S+)/gu;
           
           let obj = {};
-          const globber = await glob.create(`${{ inputs.dir }}/**/*.json`);
+          const globber = await glob.create(`${{ inputs.directory }}/**/*.json`);
           for await (const jsonReport of globber.globGenerator()) {
             console.log('jsonReport', jsonReport);
             let lr = new lineReader(jsonReport);

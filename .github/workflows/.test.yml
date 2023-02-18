@@ -159,11 +159,19 @@ jobs:
           CACHE_FROM: type=gha,scope=${{ inputs.cache_scope }}
       -
         name: Send to Codecov
+        if: always()
         uses: codecov/codecov-action@v3
         with:
           directory: ./bin/testreports
       -
+        name: Generate annotations
+        if: always()
+        uses: ./.github/actions/gotest-annotations
+        with:
+          directory: ./bin/testreports
+      -
         name: Upload test reports
+        if: always()
         uses: actions/upload-artifact@v3
         with:
           name: test-reports
