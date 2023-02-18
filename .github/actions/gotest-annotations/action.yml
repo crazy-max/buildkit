@@ -21,7 +21,7 @@ runs:
       with:
         script: |
           const lineReader = require('line-by-line');
-          const failedTestsRegex = /(\s*[\w\d]+_test.go:\d+:)(.*?)(Test:\s+Test[\w\d]*?\S+)/gu;
+          const testRegex = /(\s*[\w\d]+_test.go:\d+:)(.*?)(Test:\s+Test[\w\d]*?\S+)/gu;
           
           let obj = {};
           const globber = await glob.create(`${{ inputs.directory }}/**/*.json`);
@@ -54,7 +54,7 @@ runs:
                   continue;
                 }
                 var result;
-                while ((result = regex.exec(value)) !== null) {
+                while ((result = testRegex.exec(value)) !== null) {
                   const parts = result[0].split(":");
                   const file = key.split("/").slice(0, -2).join("/") + "/" + parts[0].trimStart();
                   const lineNumber = parts[1];
