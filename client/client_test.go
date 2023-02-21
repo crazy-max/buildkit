@@ -8897,7 +8897,7 @@ func testSourcePolicy(t *testing.T, sb integration.Sandbox) {
 							Identifier: "docker-image://docker.io/library/busybox:1.34.1-uclibc",
 						},
 						Updates: &sourcepolicypb.Update{
-							Identifier: "docker-image://docker.io/library/busybox:1.34.1-uclibc@sha256:3614ca5eacf0a3a1bcc361c939202a974b4902b9334ff36eb29ffe9011aaad83",
+							Identifier: "docker-image://docker.io/library/busybox:1.34.1-uclibc@sha256:foo",
 						},
 					},
 					{
