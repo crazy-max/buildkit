@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/moby/buildkit/util/bklog"
 	"github.com/moby/buildkit/util/testutil/integration"
 	"github.com/pkg/errors"
 )
@@ -54,7 +55,12 @@ func runBuildkitd(ctx context.Context, conf *integration.BackendConfig, args []s
 
 	address = getBuildkitdAddr(tmpdir)
 
-	args = append(args, "--root", tmpdir, "--addr", address, "--otel-socket-path", getTraceSocketPath(tmpdir), "--debug")
+	helpOut := buildkitdHelpOutput(args[0])
+	if helpOut != nil && bytes.Contains(helpOut, []byte("--otel-socket-path")) {
+		args = append(args, "--otel-socket-path="+getTraceSocketPath(tmpdir))
+	}
+
+	args = append(args, "--root", tmpdir, "--addr", address, "--debug")
 	cmd := exec.Command(args[0], args[1:]...) //nolint:gosec // test utility
 	cmd.Env = append(os.Environ(), "BUILDKIT_DEBUG_EXEC_OUTPUT=1", "BUILDKIT_DEBUG_PANIC_ON_ERROR=1", "TMPDIR="+filepath.Join(tmpdir, "tmp"))
 	cmd.Env = append(cmd.Env, extraEnv...)
@@ -86,4 +92,14 @@ func runBuildkitd(ctx context.Context, conf *integration.BackendConfig, args []s
 	})
 
 	return address, cl, err
+}
+
+func buildkitdHelpOutput(bin string) []byte {
+	cmd := exec.Command(bin, "--help")
+	b, err := cmd.CombinedOutput()
+	if err != nil {
+		bklog.L.Warnf("buildkitd command failed with: %v (%s)", err, string(b))
+		return nil
+	}
+	return b
 }
