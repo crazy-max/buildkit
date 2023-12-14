@@ -160,6 +160,8 @@ func ConvertResult[U comparable, V comparable](r *Result[U], fn func(U) (V, erro
 	}
 	for k, r := range r.Refs {
 		if r == zero {
+			var zeroV V
+			r2.Refs[k] = zeroV
 			continue
 		}
 		r2.Refs[k], err = fn(r)
