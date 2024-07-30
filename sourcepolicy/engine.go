@@ -18,7 +18,7 @@ var (
 	ErrTooManyOps = errors.New("too many operations")
 )
 
-// Engine is the source policy engine.
+// Engine   is the source policy engine.
 // It is responsible for evaluating a source policy against a source operation.
 // Create one with `NewEngine`
 //

@@ -17,7 +17,6 @@ func init() {
 }
 
 func main() {
-	// foo
 	var version bool
 	flag.BoolVar(&version, "version", false, "show version")
 	flag.Parse()
