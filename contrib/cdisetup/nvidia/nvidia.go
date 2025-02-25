@@ -94,8 +94,11 @@ func (s *setup) Run(ctx context.Context) (err error) {
 	}
 
 	var needsDriver bool
-
-	if _, err := os.Stat("/proc/driver/nvidia"); err != nil {
+	if nvidiaSmi, err := exec.LookPath("nvidia-smi"); err == nil && nvidiaSmi != "" {
+		if err := run(ctx, []string{nvidiaSmi, "-L"}, pw, dgst); err != nil {
+			needsDriver = true
+		}
+	} else if _, err := os.Stat("/proc/driver/nvidia"); err != nil {
 		needsDriver = true
 	}
 
@@ -265,6 +268,13 @@ func hasNvidiaDevices() (bool, error) {
 		if strings.TrimSpace(string(data)) == nvidiaVendorID {
 			found = true
 			break
+		}
+	}
+
+	if !found {
+		// WSL-specific GPU mapping that doesn't expose PCI info.
+		if _, err := os.Stat("/dev/dxg"); err == nil {
+			found = true
 		}
 	}
 
