@@ -9,7 +9,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"runtime"
 	"strings"
 	"time"
@@ -26,8 +25,7 @@ import (
 // This code is not currently shipping with BuildKit and will probably change.
 
 const (
-	cdiKind        = "nvidia.com/gpu"
-	defaultVersion = "570.0"
+	cdiKind = "nvidia.com/gpu"
 )
 
 func init() {
@@ -39,10 +37,6 @@ type setup struct{}
 var _ cdidevices.Setup = &setup{}
 
 func (s *setup) Validate() error {
-	_, err := readVersion()
-	if err == nil {
-		return nil
-	}
 	b, err := hasNvidiaDevices()
 	if err != nil {
 		return err
@@ -93,15 +87,6 @@ func (s *setup) Run(ctx context.Context) (err error) {
 		return errors.Errorf("NVIDIA setup is currently only supported on Debian/Ubuntu")
 	}
 
-	var needsDriver bool
-	if nvidiaSmi, err := exec.LookPath("nvidia-smi"); err == nil && nvidiaSmi != "" {
-		if err := run(ctx, []string{nvidiaSmi, "-L"}, pw, dgst); err != nil {
-			needsDriver = true
-		}
-	} else if _, err := os.Stat("/proc/driver/nvidia"); err != nil {
-		needsDriver = true
-	}
-
 	var arch string
 	switch runtime.GOARCH {
 	case "amd64":
@@ -115,29 +100,9 @@ func (s *setup) Run(ctx context.Context) (err error) {
 		return errors.Errorf("unsupported architecture: %s", runtime.GOARCH)
 	}
 
-	if needsDriver {
-		pw.Write(identity.NewID(), client.VertexWarning{
-			Vertex: dgst,
-			Short:  []byte("NVIDIA Drivers not found. Installing prebuilt drivers is not recommended"),
-		})
-	}
-
-	version, err := readVersion()
-	if err != nil && !needsDriver {
-		return errors.Wrapf(err, "failed to read NVIDIA driver version")
-	}
-	if version == "" {
-		version = defaultVersion
-	}
-	v1, _, ok := strings.Cut(version, ".")
-	if !ok {
-		return errors.Errorf("failed to parse NVIDIA driver version %q", version)
-	}
-
 	if err := run(ctx, []string{"apt-get", "update"}, pw, dgst); err != nil {
 		return err
 	}
-
 	if err := run(ctx, []string{"apt-get", "install", "-y", "gpg"}, pw, dgst); err != nil {
 		return err
 	}
@@ -176,27 +141,7 @@ func (s *setup) Run(ctx context.Context) (err error) {
 	if err := run(ctx, []string{"apt-get", "update"}, pw, dgst); err != nil {
 		return err
 	}
-
-	if needsDriver {
-		// this pretty much never works, is it even worth having?
-		// better approach could be to try to create another chroot/container that is built with same kernel packages as the host
-		// could nvidia-headless-no-dkms- be reusable
-		if err := run(ctx, []string{"apt-get", "install", "-y", "nvidia-driver-" + v1}, pw, dgst); err != nil {
-			return err
-		}
-		_, err := os.Stat("/proc/driver/nvidia")
-		if err != nil {
-			return errors.Wrapf(err, "failed to install NVIDIA kernel module. Please install NVIDIA drivers manually")
-		}
-	}
-
-	if err := run(ctx, []string{"apt-get", "install", "-y", "--no-install-recommends",
-		"libnvidia-compute-" + v1,
-		"libnvidia-extra-" + v1,
-		"libnvidia-gl-" + v1,
-		"nvidia-utils-" + v1,
-		"nvidia-container-toolkit-base",
-	}, pw, dgst); err != nil {
+	if err := run(ctx, []string{"apt-get", "install", "-y", "--no-install-recommends", "nvidia-container-toolkit-base"}, pw, dgst); err != nil {
 		return err
 	}
 
@@ -230,23 +175,6 @@ func run(ctx context.Context, args []string, pw progress.Writer, dgst digest.Dig
 	cmd.Stderr = newStream(pw, 2, dgst)
 	cmd.Stdout = newStream(pw, 1, dgst)
 	return cmd.Run()
-}
-
-func readVersion() (string, error) {
-	dt, err := os.ReadFile("/proc/driver/nvidia/version")
-	if err != nil {
-		return "", err
-	}
-	return parseVersion(string(dt))
-}
-
-func parseVersion(dt string) (string, error) {
-	re := regexp.MustCompile(`NVIDIA .* Kernel Module(?:[\s\w\d]+)?\s+(\d+\.\d+)`)
-	matches := re.FindStringSubmatch(dt)
-	if len(matches) < 2 {
-		return "", errors.Errorf("could not parse NVIDIA driver version")
-	}
-	return matches[1], nil
 }
 
 func hasNvidiaDevices() (bool, error) {
