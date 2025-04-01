@@ -11,14 +11,15 @@ import (
 )
 
 type GitIdentifier struct {
-	Remote           string
-	Ref              string
-	Subdir           string
-	KeepGitDir       bool
-	AuthTokenSecret  string
-	AuthHeaderSecret string
-	MountSSHSock     string
-	KnownSSHHosts    string
+	Remote              string
+	Ref                 string
+	Subdir              string
+	KeepGitDir          bool
+	NoRecurseSubmodules bool
+	AuthTokenSecret     string
+	AuthHeaderSecret    string
+	MountSSHSock        string
+	KnownSSHHosts       string
 }
 
 func NewGitIdentifier(remoteURL string) (*GitIdentifier, error) {

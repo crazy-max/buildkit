@@ -79,6 +79,10 @@ func (gs *gitSource) Identifier(scheme, ref string, attrs map[string]string, pla
 			if v == "true" {
 				id.KeepGitDir = true
 			}
+		case pb.AttrNoRecurseSubmodules:
+			if v == "true" {
+				id.NoRecurseSubmodules = true
+			}
 		case pb.AttrFullRemoteURL:
 			if !gitutil.IsGitTransport(v) {
 				v = "https://" + v
@@ -634,10 +638,12 @@ func (gs *gitSourceHandler) Snapshot(ctx context.Context, g session.Group) (out 
 		}
 	}
 
-	git = git.New(gitutil.WithWorkTree(checkoutDir), gitutil.WithGitDir(gitDir))
-	_, err = git.Run(ctx, "submodule", "update", "--init", "--recursive", "--depth=1")
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to update submodules for %s", urlutil.RedactCredentials(gs.src.Remote))
+	if !gs.src.NoRecurseSubmodules {
+		git = git.New(gitutil.WithWorkTree(checkoutDir), gitutil.WithGitDir(gitDir))
+		_, err = git.Run(ctx, "submodule", "update", "--init", "--recursive", "--depth=1")
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to update submodules for %s", urlutil.RedactCredentials(gs.src.Remote))
+		}
 	}
 
 	if idmap := mount.IdentityMapping(); idmap != nil {

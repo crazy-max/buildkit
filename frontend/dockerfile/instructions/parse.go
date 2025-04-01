@@ -338,6 +338,7 @@ func parseAdd(req parseRequest) (*AddCommand, error) {
 	flChmod := req.flags.AddString("chmod", "")
 	flLink := req.flags.AddBool("link", false)
 	flKeepGitDir := req.flags.AddBool("keep-git-dir", false)
+	flNoRecurseSubmodules := req.flags.AddBool("no-recurse-submodules", false)
 	flChecksum := req.flags.AddString("checksum", "")
 	if err := req.flags.Parse(); err != nil {
 		return nil, err
@@ -349,14 +350,15 @@ func parseAdd(req parseRequest) (*AddCommand, error) {
 	}
 
 	return &AddCommand{
-		withNameAndCode: newWithNameAndCode(req),
-		SourcesAndDest:  *sourcesAndDest,
-		Chown:           flChown.Value,
-		Chmod:           flChmod.Value,
-		Link:            flLink.Value == "true",
-		KeepGitDir:      flKeepGitDir.Value == "true",
-		Checksum:        flChecksum.Value,
-		ExcludePatterns: stringValuesFromFlagIfPossible(flExcludes),
+		withNameAndCode:     newWithNameAndCode(req),
+		SourcesAndDest:      *sourcesAndDest,
+		Chown:               flChown.Value,
+		Chmod:               flChmod.Value,
+		Link:                flLink.Value == "true",
+		KeepGitDir:          flKeepGitDir.Value == "true",
+		NoRecurseSubmodules: flNoRecurseSubmodules.Value == "true",
+		Checksum:            flChecksum.Value,
+		ExcludePatterns:     stringValuesFromFlagIfPossible(flExcludes),
 	}, nil
 }
 

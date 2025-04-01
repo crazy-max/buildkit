@@ -240,12 +240,13 @@ func (s *SourcesAndDest) ExpandRaw(expander SingleWordExpander) error {
 type AddCommand struct {
 	withNameAndCode
 	SourcesAndDest
-	Chown           string
-	Chmod           string
-	Link            bool
-	ExcludePatterns []string
-	KeepGitDir      bool // whether to keep .git dir, only meaningful for git sources
-	Checksum        string
+	Chown               string
+	Chmod               string
+	Link                bool
+	ExcludePatterns     []string
+	KeepGitDir          bool // whether to keep .git dir, only meaningful for git sources
+	NoRecurseSubmodules bool
+	Checksum            string
 }
 
 func (c *AddCommand) Expand(expander SingleWordExpander) error {

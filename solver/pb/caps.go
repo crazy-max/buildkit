@@ -22,13 +22,14 @@ const (
 	CapSourceLocalSharedKeyHint   apicaps.CapID = "source.local.sharedkeyhint"
 	CapSourceLocalDiffer          apicaps.CapID = "source.local.differ"
 
-	CapSourceGit              apicaps.CapID = "source.git"
-	CapSourceGitKeepDir       apicaps.CapID = "source.git.keepgitdir"
-	CapSourceGitFullURL       apicaps.CapID = "source.git.fullurl"
-	CapSourceGitHTTPAuth      apicaps.CapID = "source.git.httpauth"
-	CapSourceGitKnownSSHHosts apicaps.CapID = "source.git.knownsshhosts"
-	CapSourceGitMountSSHSock  apicaps.CapID = "source.git.mountsshsock"
-	CapSourceGitSubdir        apicaps.CapID = "source.git.subdir"
+	CapSourceGit                 apicaps.CapID = "source.git"
+	CapSourceGitKeepDir          apicaps.CapID = "source.git.keepgitdir"
+	CapSourceNoRecurseSubmodules apicaps.CapID = "source.git.norecursesubmodules"
+	CapSourceGitFullURL          apicaps.CapID = "source.git.fullurl"
+	CapSourceGitHTTPAuth         apicaps.CapID = "source.git.httpauth"
+	CapSourceGitKnownSSHHosts    apicaps.CapID = "source.git.knownsshhosts"
+	CapSourceGitMountSSHSock     apicaps.CapID = "source.git.mountsshsock"
+	CapSourceGitSubdir           apicaps.CapID = "source.git.subdir"
 
 	CapSourceHTTP         apicaps.CapID = "source.http"
 	CapSourceHTTPAuth     apicaps.CapID = "source.http.auth"
@@ -180,6 +181,12 @@ func init() {
 
 	Caps.Init(apicaps.Cap{
 		ID:      CapSourceGitKeepDir,
+		Enabled: true,
+		Status:  apicaps.CapStatusExperimental,
+	})
+
+	Caps.Init(apicaps.Cap{
+		ID:      CapSourceNoRecurseSubmodules,
 		Enabled: true,
 		Status:  apicaps.CapStatusExperimental,
 	})

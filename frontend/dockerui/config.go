@@ -45,12 +45,13 @@ const (
 
 	// Don't forget to update frontend documentation if you add
 	// a new build-arg: frontend/dockerfile/docs/reference.md
-	keyCacheNSArg           = "build-arg:BUILDKIT_CACHE_MOUNT_NS"
-	keyMultiPlatformArg     = "build-arg:BUILDKIT_MULTI_PLATFORM"
-	keyHostnameArg          = "build-arg:BUILDKIT_SANDBOX_HOSTNAME"
-	keyDockerfileLintArg    = "build-arg:BUILDKIT_DOCKERFILE_CHECK"
-	keyContextKeepGitDirArg = "build-arg:BUILDKIT_CONTEXT_KEEP_GIT_DIR"
-	keySourceDateEpoch      = "build-arg:SOURCE_DATE_EPOCH"
+	keyCacheNSArg                 = "build-arg:BUILDKIT_CACHE_MOUNT_NS"
+	keyMultiPlatformArg           = "build-arg:BUILDKIT_MULTI_PLATFORM"
+	keyHostnameArg                = "build-arg:BUILDKIT_SANDBOX_HOSTNAME"
+	keyDockerfileLintArg          = "build-arg:BUILDKIT_DOCKERFILE_CHECK"
+	keyContextKeepGitDirArg       = "build-arg:BUILDKIT_CONTEXT_KEEP_GIT_DIR"
+	keyContextNoRecurseSubmodules = "build-arg:BUILDKIT_CONTEXT_NO_RECURSE_SUBMODULES"
+	keySourceDateEpoch            = "build-arg:SOURCE_DATE_EPOCH"
 )
 
 type Config struct {

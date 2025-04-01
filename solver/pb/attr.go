@@ -1,6 +1,7 @@
 package pb
 
 const AttrKeepGitDir = "git.keepgitdir"
+const AttrNoRecurseSubmodules = "git.norecursesubmodules"
 const AttrFullRemoteURL = "git.fullurl"
 const AttrAuthHeaderSecret = "git.authheadersecret"
 const AttrAuthTokenSecret = "git.authtokensecret"

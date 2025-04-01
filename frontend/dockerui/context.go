@@ -73,7 +73,11 @@ func (bc *Client) initContext(ctx context.Context) (*buildContext, error) {
 	if v, err := strconv.ParseBool(opts[keyContextKeepGitDirArg]); err == nil {
 		keepGit = v
 	}
-	if st, ok := DetectGitContext(opts[localNameContext], keepGit); ok {
+	noRecurseSubmodules := false
+	if v, err := strconv.ParseBool(opts[keyContextNoRecurseSubmodules]); err == nil {
+		noRecurseSubmodules = v
+	}
+	if st, ok := DetectGitContext(opts[localNameContext], keepGit, noRecurseSubmodules); ok {
 		bctx.context = st
 		bctx.dockerfile = st
 	} else if st, filename, ok := DetectHTTPContext(opts[localNameContext]); ok {
@@ -140,7 +144,7 @@ func (bc *Client) initContext(ctx context.Context) (*buildContext, error) {
 	return bctx, nil
 }
 
-func DetectGitContext(ref string, keepGit bool) (*llb.State, bool) {
+func DetectGitContext(ref string, keepGit bool, noRecurseSubmodules bool) (*llb.State, bool) {
 	g, err := gitutil.ParseGitRef(ref)
 	if err != nil {
 		return nil, false
@@ -152,6 +156,9 @@ func DetectGitContext(ref string, keepGit bool) (*llb.State, bool) {
 	gitOpts := []llb.GitOption{WithInternalName("load git source " + ref)}
 	if keepGit {
 		gitOpts = append(gitOpts, llb.KeepGitDir())
+	}
+	if noRecurseSubmodules {
+		gitOpts = append(gitOpts, llb.NoRecurseSubmodules())
 	}
 
 	st := llb.Git(g.Remote, commit, gitOpts...)

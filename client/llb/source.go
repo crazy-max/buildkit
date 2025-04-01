@@ -286,6 +286,10 @@ func Git(url, ref string, opts ...GitOption) State {
 		attrs[pb.AttrKeepGitDir] = "true"
 		addCap(&gi.Constraints, pb.CapSourceGitKeepDir)
 	}
+	if gi.NoRecurseSubmodules {
+		attrs[pb.AttrNoRecurseSubmodules] = "true"
+		addCap(&gi.Constraints, pb.CapSourceNoRecurseSubmodules)
+	}
 	if url != "" {
 		attrs[pb.AttrFullRemoteURL] = url
 		addCap(&gi.Constraints, pb.CapSourceGitFullURL)
@@ -339,17 +343,24 @@ func (fn gitOptionFunc) SetGitOption(gi *GitInfo) {
 
 type GitInfo struct {
 	constraintsWrapper
-	KeepGitDir       bool
-	AuthTokenSecret  string
-	AuthHeaderSecret string
-	addAuthCap       bool
-	KnownSSHHosts    string
-	MountSSHSock     string
+	KeepGitDir          bool
+	NoRecurseSubmodules bool
+	AuthTokenSecret     string
+	AuthHeaderSecret    string
+	addAuthCap          bool
+	KnownSSHHosts       string
+	MountSSHSock        string
 }
 
 func KeepGitDir() GitOption {
 	return gitOptionFunc(func(gi *GitInfo) {
 		gi.KeepGitDir = true
+	})
+}
+
+func NoRecurseSubmodules() GitOption {
+	return gitOptionFunc(func(gi *GitInfo) {
+		gi.NoRecurseSubmodules = true
 	})
 }
 

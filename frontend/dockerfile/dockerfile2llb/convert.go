@@ -948,19 +948,20 @@ func dispatch(d *dispatchState, cmd command, opt dispatchOpt) error {
 		}
 		if err == nil {
 			err = dispatchCopy(d, copyConfig{
-				params:          c.SourcesAndDest,
-				excludePatterns: c.ExcludePatterns,
-				source:          opt.buildContext,
-				isAddCommand:    true,
-				cmdToPrint:      c,
-				chown:           c.Chown,
-				chmod:           c.Chmod,
-				link:            c.Link,
-				keepGitDir:      c.KeepGitDir,
-				checksum:        checksum,
-				location:        c.Location(),
-				ignoreMatcher:   opt.dockerIgnoreMatcher,
-				opt:             opt,
+				params:              c.SourcesAndDest,
+				excludePatterns:     c.ExcludePatterns,
+				source:              opt.buildContext,
+				isAddCommand:        true,
+				cmdToPrint:          c,
+				chown:               c.Chown,
+				chmod:               c.Chmod,
+				link:                c.Link,
+				keepGitDir:          c.KeepGitDir,
+				noRecurseSubmodules: c.NoRecurseSubmodules,
+				checksum:            checksum,
+				location:            c.Location(),
+				ignoreMatcher:       opt.dockerIgnoreMatcher,
+				opt:                 opt,
 			})
 		}
 		if err == nil {
@@ -1511,6 +1512,9 @@ func dispatchCopy(d *dispatchState, cfg copyConfig) error {
 			if cfg.keepGitDir {
 				gitOptions = append(gitOptions, llb.KeepGitDir())
 			}
+			if cfg.noRecurseSubmodules {
+				gitOptions = append(gitOptions, llb.NoRecurseSubmodules())
+			}
 			st := llb.Git(gitRef.Remote, commit, gitOptions...)
 			opts := append([]llb.CopyOption{&llb.CopyInfo{
 				Mode:           chopt,
@@ -1657,20 +1661,21 @@ func dispatchCopy(d *dispatchState, cfg copyConfig) error {
 }
 
 type copyConfig struct {
-	params          instructions.SourcesAndDest
-	excludePatterns []string
-	source          llb.State
-	isAddCommand    bool
-	cmdToPrint      fmt.Stringer
-	chown           string
-	chmod           string
-	link            bool
-	keepGitDir      bool
-	checksum        digest.Digest
-	parents         bool
-	location        []parser.Range
-	ignoreMatcher   *patternmatcher.PatternMatcher
-	opt             dispatchOpt
+	params              instructions.SourcesAndDest
+	excludePatterns     []string
+	source              llb.State
+	isAddCommand        bool
+	cmdToPrint          fmt.Stringer
+	chown               string
+	chmod               string
+	link                bool
+	keepGitDir          bool
+	noRecurseSubmodules bool
+	checksum            digest.Digest
+	parents             bool
+	location            []parser.Range
+	ignoreMatcher       *patternmatcher.PatternMatcher
+	opt                 dispatchOpt
 }
 
 func dispatchMaintainer(d *dispatchState, c *instructions.MaintainerCommand) error {

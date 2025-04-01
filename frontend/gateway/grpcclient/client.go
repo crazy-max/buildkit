@@ -271,6 +271,7 @@ func defaultLLBCaps() []*apicaps.PBCap {
 		{ID: string(opspb.CapSourceLocalSharedKeyHint), Enabled: true},
 		{ID: string(opspb.CapSourceGit), Enabled: true},
 		{ID: string(opspb.CapSourceGitKeepDir), Enabled: true},
+		{ID: string(opspb.CapSourceNoRecurseSubmodules), Enabled: true},
 		{ID: string(opspb.CapSourceGitFullURL), Enabled: true},
 		{ID: string(opspb.CapSourceHTTP), Enabled: true},
 		{ID: string(opspb.CapSourceHTTPChecksum), Enabled: true},
