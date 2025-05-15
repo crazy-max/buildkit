@@ -60,18 +60,20 @@ COPY --link --from=googleapis /opt/googleapis /
 COPY --link --from=vtprotobuf /opt/vtprotobuf /
 COPY --link --from=vendored /opt/vendored /
 
-FROM gobuild-base AS tools
-RUN --mount=type=bind,source=go.mod,target=/app/go.mod \
-    --mount=type=bind,source=go.sum,target=/app/go.sum \
-    --mount=type=cache,target=/root/.cache \
-    --mount=type=cache,target=/go/pkg/mod \
-  go install \
-    github.com/planetscale/vtprotobuf/cmd/protoc-gen-go-vtproto \
-    google.golang.org/grpc/cmd/protoc-gen-go-grpc \
-    google.golang.org/protobuf/cmd/protoc-gen-go
+FROM gobuild-base AS generated
+COPY --chmod=755 <<-"EOF" /usr/local/bin/protoc-gen-go-vtproto
+	#!/bin/sh
+	exec go tool protoc-gen-go-vtproto
+EOF
+COPY --chmod=755 <<-"EOF" /usr/local/bin/protoc-gen-go-grpc
+	#!/bin/sh
+	exec go tool protoc-gen-go-grpc
+EOF
+COPY --chmod=755 <<-"EOF" /usr/local/bin/protoc-gen-go
+	#!/bin/sh
+	exec go tool protoc-gen-go
+EOF
 COPY --link --from=protobuf / /usr/local
-
-FROM tools AS generated
 RUN --mount=type=bind,target=github.com/moby/buildkit <<EOT
   set -ex
   mkdir /out
