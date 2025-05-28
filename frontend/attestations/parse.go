@@ -13,6 +13,7 @@ const (
 )
 
 const (
+	defaultSLSAVersion   = "v0.2"
 	defaultSBOMGenerator = "docker/buildkit-syft-scanner:stable-1"
 )
 
@@ -59,6 +60,8 @@ func Parse(values map[string]string) (map[string]map[string]string, error) {
 		out[k] = attrs
 		if k == KeyTypeSbom {
 			attrs["generator"] = defaultSBOMGenerator
+		} else if k == KeyTypeProvenance {
+			attrs["version"] = defaultSLSAVersion
 		}
 		if v == "" {
 			continue

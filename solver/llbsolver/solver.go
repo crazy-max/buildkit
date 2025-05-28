@@ -220,11 +220,14 @@ func (s *Solver) recordBuildHistory(ctx context.Context, id string, req frontend
 			"capture-usage": "true",
 		}
 
-		// infer builder-id from user input if available
+		// infer slsa version and builder-id from user input if available
 		if attests, err := attestations.Parse(rec.FrontendAttrs); err == nil {
 			if prvAttrs, ok := attests["provenance"]; ok {
 				if builderID, ok := prvAttrs["builder-id"]; ok {
 					attrs["builder-id"] = builderID
+				}
+				if slsaVersion, ok := prvAttrs["version"]; ok {
+					attrs["version"] = slsaVersion
 				}
 			}
 		}

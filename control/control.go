@@ -508,7 +508,22 @@ func (c *Controller) Solve(ctx context.Context, req *controlapi.SolveRequest) (*
 	}
 
 	if attrs, ok := attests["provenance"]; ok {
-		procs = append(procs, proc.ProvenanceProcessor(attrs))
+		var slsaVersion string
+		params := make(map[string]string)
+		for k, v := range attrs {
+			if k == "version" {
+				if v == "" {
+					return nil, errors.Errorf("provenance SLSA specification version cannot be empty")
+				}
+				if v != "v0.2" && v != "v1" {
+					return nil, errors.Errorf("invalid provenance SLSA specification version %q, must be one of v0.2 or v1", v)
+				}
+				slsaVersion = v
+			} else {
+				params[k] = v
+			}
+		}
+		procs = append(procs, proc.ProvenanceProcessor(slsaVersion, params))
 	}
 
 	resp, err := c.solver.Solve(ctx, req.Ref, req.Session, frontend.SolveRequest{

@@ -437,7 +437,7 @@ func NewProvenanceCreator(ctx context.Context, cp *provenance.Capture, res solve
 
 			if len(m) != 0 {
 				if pr.Metadata == nil {
-					pr.Metadata = &provenancetypes.ProvenanceMetadata{}
+					pr.Metadata = &provenancetypes.ProvenanceMetadataSLSA02{}
 				}
 
 				pr.Metadata.BuildKitMetadata.Layers = m
@@ -595,7 +595,7 @@ func AddBuildConfig(ctx context.Context, p *provenancetypes.ProvenancePredicate,
 			}
 
 			if p.Metadata == nil {
-				p.Metadata = &provenancetypes.ProvenanceMetadata{}
+				p.Metadata = &provenancetypes.ProvenanceMetadataSLSA02{}
 			}
 			p.Metadata.BuildKitMetadata.Source = &provenancetypes.Source{
 				Infos:     sis,

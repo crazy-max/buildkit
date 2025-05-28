@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	slsa02 "github.com/in-toto/in-toto-golang/in_toto/slsa_provenance/v0.2"
+	slsa1 "github.com/in-toto/in-toto-golang/in_toto/slsa_provenance/v1"
 	"github.com/moby/buildkit/executor/resources"
 	"github.com/moby/buildkit/exporter/containerimage/exptypes"
 	gatewaypb "github.com/moby/buildkit/frontend/gateway/pb"
@@ -16,7 +17,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-func ProvenanceProcessor(attrs map[string]string) llbsolver.Processor {
+func ProvenanceProcessor(version string, attrs map[string]string) llbsolver.Processor {
 	return func(ctx context.Context, res *llbsolver.Result, s *llbsolver.Solver, j *solver.Job, usage *resources.SysSampler) (*llbsolver.Result, error) {
 		span, ctx := tracing.StartSpan(ctx, "create provenance attestation")
 		defer span.End()
@@ -63,7 +64,12 @@ func ProvenanceProcessor(attrs map[string]string) llbsolver.Processor {
 					result.AttestationInlineOnlyKey: []byte(strconv.FormatBool(inlineOnly)),
 				},
 				InToto: result.InTotoAttestation{
-					PredicateType: slsa02.PredicateSLSAProvenance,
+					PredicateType: func(version string) string {
+						if version == "v1" {
+							return slsa1.PredicateSLSAProvenance
+						}
+						return slsa02.PredicateSLSAProvenance
+					}(version),
 				},
 				Path: filename,
 				ContentFunc: func(ctx context.Context) ([]byte, error) {
