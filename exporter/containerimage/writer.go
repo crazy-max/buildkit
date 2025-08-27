@@ -185,7 +185,7 @@ func (ic *ImageWriter) Commit(ctx context.Context, inp *exporter.Source, session
 		return mfstDesc, nil
 	}
 
-	if len(inp.Attestations) > 0 {
+	if len(inp.Attestations) > 0 && !opts.OCITypes {
 		return nil, errors.New("cannot export attestations with \"oci-mediatypes=false\"")
 	}
 
