@@ -618,6 +618,7 @@ func (ic *ImageWriter) commitAttestationsManifest(ctx context.Context, opts *Ima
 	if ociArtifact {
 		mfst.ArtifactType = attestationManifestArtifactType
 		mfst.Subject = &target
+		mfst.Subject.Platform = nil // clear platform for subject
 	}
 
 	labels := map[string]string{
