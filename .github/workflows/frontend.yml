@@ -61,7 +61,6 @@ jobs:
   image:
     runs-on: ubuntu-24.04
     needs:
-      - test
       - prepare
     strategy:
       fail-fast: false
