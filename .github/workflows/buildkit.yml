@@ -230,7 +230,6 @@ jobs:
     uses: docker/github-builder-experimental/.github/workflows/bake.yml@c56377b5e16c21afb2f3ea02f9021a1ed4b51f45
     needs:
       - image-prepare
-      - test
     strategy:
       fail-fast: false
       matrix:
