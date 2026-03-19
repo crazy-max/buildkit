@@ -2,10 +2,12 @@ package llbsolver
 
 import (
 	"context"
+	"maps"
 	"os"
 	"strings"
 	"time"
 
+	controlapi "github.com/moby/buildkit/api/services/control"
 	"github.com/moby/buildkit/cache"
 	"github.com/moby/buildkit/cache/remotecache"
 	"github.com/moby/buildkit/client"
@@ -32,15 +34,25 @@ import (
 )
 
 type ExporterRequest struct {
-	Exporters             []exporter.ExporterInstance
+	Exporters             []Exporter
 	CacheExporters        []RemoteCacheExporter
 	EnableSessionExporter bool
+}
+
+type Exporter struct {
+	exporter.ExporterInstance
+
+	// ID identifies the exporter.
+	ID string
 }
 
 type RemoteCacheExporter struct {
 	remotecache.Exporter
 	solver.CacheExportMode
 	IgnoreError bool
+
+	// ID identifies the exporter.
+	ID string
 }
 
 // ResolveWorkerFunc returns default worker for the temporary default non-distributed use cases
@@ -152,7 +164,7 @@ func (s *Solver) Bridge(b solver.Builder) frontend.FrontendLLBBridge {
 	return s.bridge(b)
 }
 
-func (s *Solver) Solve(ctx context.Context, id string, sessionID string, req frontend.SolveRequest, exp ExporterRequest, ent []entitlements.Entitlement, post []Processor, internal bool, srcPol *spb.Policy, policySession string) (_ *client.SolveResponse, err error) {
+func (s *Solver) Solve(ctx context.Context, id string, sessionID string, req frontend.SolveRequest, exp ExporterRequest, ent []entitlements.Entitlement, post []Processor, internal bool, srcPol *spb.Policy, policySession string) (_ *controlapi.SolveResponse, err error) {
 	j, err := s.solver.NewJob(id)
 	if err != nil {
 		return nil, err
@@ -334,9 +346,9 @@ func (s *Solver) Solve(ctx context.Context, id string, sessionID string, req fro
 		exp.Exporters = append(exp.Exporters, exporters...)
 	}
 
-	var exporterResponse map[string]string
+	var exporterResponses []*controlapi.ExporterResponse
 	var finalizers []exporter.FinalizeFunc
-	exporterResponse, finalizers, descrefs, err = s.runExporters(ctx, id, exp.Exporters, inlineCacheExporter, j, cached, inp)
+	exporterResponses, finalizers, descrefs, err = s.runExporters(ctx, id, exp.Exporters, inlineCacheExporter, j, cached, inp)
 	if err != nil {
 		return nil, err
 	}
@@ -353,34 +365,40 @@ func (s *Solver) Solve(ctx context.Context, id string, sessionID string, req fro
 			return finalize(egCtx)
 		})
 	}
-	var cacheExporterResponse map[string]string
+	var cacheExporterResponses []*controlapi.ExporterResponse
 	eg.Go(func() error {
 		var err error
-		cacheExporterResponse, err = runCacheExporters(egCtx, cacheExporters, j, cached, inp)
+		cacheExporterResponses, err = runCacheExporters(egCtx, cacheExporters, j, cached, inp)
 		return err
 	})
 	if err := eg.Wait(); err != nil {
 		return nil, err
 	}
 
-	if exporterResponse == nil {
-		exporterResponse = make(map[string]string)
+	resp := &controlapi.SolveResponse{
+		ExporterResponseDeprecated: make(map[string]string),
+		ExporterResponses:          exporterResponses,
+		CacheExporterResponses:     cacheExporterResponses,
 	}
 
 	for k, v := range res.Metadata {
 		if strings.HasPrefix(k, "frontend.") {
-			exporterResponse[k] = string(v)
-		}
-	}
-	for k, v := range cacheExporterResponse {
-		if strings.HasPrefix(k, "cache.") {
-			exporterResponse[k] = v
+			resp.ExporterResponseDeprecated[k] = string(v)
 		}
 	}
 
-	return &client.SolveResponse{
-		ExporterResponse: exporterResponse,
-	}, nil
+	for _, exporterResponse := range exporterResponses {
+		maps.Copy(resp.ExporterResponseDeprecated, exporterResponse.Data)
+	}
+	for _, cacheExporterResponse := range cacheExporterResponses {
+		for k, v := range cacheExporterResponse.Data {
+			if strings.HasPrefix(k, "cache.") {
+				resp.ExporterResponseDeprecated[k] = v
+			}
+		}
+	}
+
+	return resp, nil
 }
 
 func (s *Solver) leaseManager() (*leaseutil.Manager, error) {

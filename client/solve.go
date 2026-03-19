@@ -322,7 +322,7 @@ func (c *Client) solve(ctx context.Context, def *llb.Definition, runGateway runG
 			return errors.Wrap(err, "failed to solve")
 		}
 		res = &SolveResponse{
-			ExporterResponse: resp.ExporterResponse,
+			ExporterResponse: resp.ExporterResponseDeprecated,
 		}
 		return nil
 	})
