@@ -56,5 +56,32 @@ type SolveStatus struct {
 
 type SolveResponse struct {
 	// ExporterResponse is also used for CacheExporter
-	ExporterResponse map[string]string
+	ExporterResponse       map[string]string
+	ExporterResponses      []ExporterResponse
+	CacheExporterResponses []ExporterResponse
+}
+
+func (r *SolveResponse) ExporterResponseByID(id string) *ExporterResponse {
+	return exporterResponses(r.ExporterResponses).withID(id)
+}
+
+func (r *SolveResponse) CacheExporterResponseByID(id string) *ExporterResponse {
+	return exporterResponses(r.CacheExporterResponses).withID(id)
+}
+
+func (r exporterResponses) withID(id string) *ExporterResponse {
+	for i := range r {
+		if r[i].ID == id {
+			return &r[i]
+		}
+	}
+	return nil
+}
+
+type exporterResponses []ExporterResponse
+
+type ExporterResponse struct {
+	ID   string
+	Type string
+	Data map[string]string
 }

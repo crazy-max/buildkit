@@ -8,6 +8,7 @@ import (
 	"maps"
 	"os"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -67,6 +68,10 @@ type ExportEntry struct {
 type CacheOptionsEntry struct {
 	Type  string
 	Attrs map[string]string
+
+	// id identifies the cache exporter in the solve configuration.
+	// It is assigned internally by the client.
+	id string
 }
 
 // Solve calls Solve on the controller.
@@ -127,6 +132,10 @@ func (c *Client) solve(ctx context.Context, def *llb.Definition, runGateway runG
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to create session")
 		}
+	}
+
+	for i := range opt.CacheExports {
+		opt.CacheExports[i].id = strconv.Itoa(i)
 	}
 
 	cacheOpt, err := parseCacheOptions(ctx, runGateway != nil, opt)
@@ -294,6 +303,7 @@ func (c *Client) solve(ctx context.Context, def *llb.Definition, runGateway runG
 			exports = append(exports, &controlapi.Exporter{
 				Type:  exp.Type,
 				Attrs: exp.Attrs,
+				ID:    strconv.Itoa(i),
 			})
 		}
 
@@ -322,7 +332,22 @@ func (c *Client) solve(ctx context.Context, def *llb.Definition, runGateway runG
 			return errors.Wrap(err, "failed to solve")
 		}
 		res = &SolveResponse{
-			ExporterResponse: resp.ExporterResponseDeprecated,
+			ExporterResponse:  resp.ExporterResponseDeprecated,
+			ExporterResponses: make([]ExporterResponse, 0, len(resp.ExporterResponses)),
+		}
+		for _, resp := range resp.ExporterResponses {
+			res.ExporterResponses = append(res.ExporterResponses, ExporterResponse{
+				ID:   resp.Metadata.ID,
+				Type: resp.Metadata.Type,
+				Data: resp.Data,
+			})
+		}
+		for _, resp := range resp.CacheExporterResponses {
+			res.CacheExporterResponses = append(res.CacheExporterResponses, ExporterResponse{
+				ID:   resp.Metadata.ID,
+				Type: resp.Metadata.Type,
+				Data: resp.Data,
+			})
 		}
 		return nil
 	})
@@ -513,6 +538,7 @@ func parseCacheOptions(ctx context.Context, isGateway bool, opt SolveOpt) (*cach
 		cacheExports = append(cacheExports, &controlapi.CacheOptionsEntry{
 			Type:  ex.Type,
 			Attrs: ex.Attrs,
+			ID:    ex.id,
 		})
 	}
 	for _, im := range opt.CacheImports {
