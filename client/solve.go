@@ -57,6 +57,11 @@ type SolveOpt struct {
 	Ref                   string
 }
 
+type ociStore struct {
+	path string
+	tag  string
+}
+
 type ExportEntry struct {
 	Type        string
 	Attrs       map[string]string
@@ -143,7 +148,7 @@ func (c *Client) solve(ctx context.Context, def *llb.Definition, runGateway runG
 		return nil, err
 	}
 
-	storesToUpdate := []string{}
+	storesToUpdate := make(map[string]ociStore)
 
 	if !opt.SessionPreInitialized {
 		if len(syncedDirs) > 0 {
@@ -210,7 +215,7 @@ func (c *Client) solve(ctx context.Context, def *llb.Definition, runGateway runG
 					if err != nil {
 						return nil, err
 					}
-					storesToUpdate = append(storesToUpdate, ex.OutputDir)
+					storesToUpdate[strconv.Itoa(exID)] = ociStore{path: ex.OutputDir}
 				}
 
 				// TODO: this should be dependent on the exporter id (to allow multiple oci exporters)
@@ -407,45 +412,102 @@ func (c *Client) solve(ctx context.Context, def *llb.Definition, runGateway runG
 	if err := eg.Wait(); err != nil {
 		return nil, err
 	}
-	// Update index.json of exported cache content store
-	// FIXME(AkihiroSuda): dedupe const definition of cache/remotecache.ExporterResponseManifestDesc = "cache.manifest"
-	if manifestDescJSON := res.ExporterResponse["cache.manifest"]; manifestDescJSON != "" {
-		var manifestDesc ocispecs.Descriptor
-		if err = json.Unmarshal([]byte(manifestDescJSON), &manifestDesc); err != nil {
-			return nil, err
-		}
-		for storePath, tag := range cacheOpt.storesToUpdate {
-			idx := ociindex.NewStoreIndex(storePath)
-			if err := idx.Put(manifestDesc, ociindex.Tag(tag)); err != nil {
-				return nil, err
-			}
-		}
-	}
-	if manifestDescDt := res.ExporterResponse[exptypes.ExporterImageDescriptorKey]; manifestDescDt != "" {
-		manifestDescDt, err := base64.StdEncoding.DecodeString(manifestDescDt)
+	for id, store := range cacheOpt.storesToUpdate {
+		manifestDesc, err := getCacheManifestDescriptor(id, res)
 		if err != nil {
 			return nil, err
 		}
-		var manifestDesc ocispecs.Descriptor
-		if err = json.Unmarshal(manifestDescDt, &manifestDesc); err != nil {
+		if manifestDesc == nil {
+			continue
+		}
+		idx := ociindex.NewStoreIndex(store.path)
+		if err := idx.Put(*manifestDesc, ociindex.Tag(store.tag)); err != nil {
 			return nil, err
 		}
-		for _, storePath := range storesToUpdate {
-			names := []ociindex.NameOrTag{ociindex.Tag("latest")}
-			if t, ok := res.ExporterResponse[exptypes.ExporterImageNameKey]; ok {
-				inp := strings.Split(t, ",")
-				names = make([]ociindex.NameOrTag, len(inp))
-				for i, n := range inp {
-					names[i] = ociindex.Name(n)
-				}
-			}
-			idx := ociindex.NewStoreIndex(storePath)
-			if err := idx.Put(manifestDesc, names...); err != nil {
-				return nil, err
-			}
+	}
+
+	if len(storesToUpdate) == 0 {
+		return res, nil
+	}
+	for id, store := range storesToUpdate {
+		manifestDesc, err := getManifestDescriptor(id, res)
+		if err != nil {
+			return nil, err
+		}
+		if manifestDesc == nil {
+			continue
+		}
+		idx := ociindex.NewStoreIndex(store.path)
+		if err := idx.Put(*manifestDesc, getManifestNames(id, res)...); err != nil {
+			return nil, err
 		}
 	}
 	return res, nil
+}
+
+func getCacheManifestDescriptor(exporterID string, resp *SolveResponse) (*ocispecs.Descriptor, error) {
+	const exporterResponseManifestDesc = "cache.manifest"
+	if manifestDescJSON := cacheExporterResponseValue(resp, exporterID, exporterResponseManifestDesc); manifestDescJSON != "" {
+		return unmarshalDescriptorJSON(manifestDescJSON)
+	}
+	return nil, nil
+}
+
+func getManifestDescriptor(exporterID string, resp *SolveResponse) (*ocispecs.Descriptor, error) {
+	if manifestDescDt := exporterResponseValue(resp, exporterID, exptypes.ExporterImageDescriptorKey); manifestDescDt != "" {
+		return unmarshalBase64Descriptor(manifestDescDt)
+	}
+	return nil, nil
+}
+
+func getManifestNames(exporterID string, resp *SolveResponse) []ociindex.NameOrTag {
+	names := []ociindex.NameOrTag{ociindex.Tag("latest")}
+	if t := exporterResponseValue(resp, exporterID, exptypes.ExporterImageNameKey); t != "" {
+		inp := strings.Split(t, ",")
+		names = make([]ociindex.NameOrTag, len(inp))
+		for i, n := range inp {
+			names[i] = ociindex.Name(n)
+		}
+	}
+	return names
+}
+
+func exporterResponseValue(resp *SolveResponse, exporterID, key string) string {
+	if exp := resp.ExporterResponseByID(exporterID); exp != nil {
+		if value := exp.Data[key]; value != "" {
+			return value
+		}
+	}
+	return resp.ExporterResponse[key]
+}
+
+func cacheExporterResponseValue(resp *SolveResponse, exporterID, key string) string {
+	if exp := resp.CacheExporterResponseByID(exporterID); exp != nil {
+		if value := exp.Data[key]; value != "" {
+			return value
+		}
+	}
+	return resp.ExporterResponse[key]
+}
+
+func unmarshalBase64Descriptor(manifestDesc string) (*ocispecs.Descriptor, error) {
+	manifestDescDt, err := base64.StdEncoding.DecodeString(manifestDesc)
+	if err != nil {
+		return nil, err
+	}
+	var desc ocispecs.Descriptor
+	if err = json.Unmarshal(manifestDescDt, &desc); err != nil {
+		return nil, err
+	}
+	return &desc, nil
+}
+
+func unmarshalDescriptorJSON(manifestDesc string) (*ocispecs.Descriptor, error) {
+	var desc ocispecs.Descriptor
+	if err := json.Unmarshal([]byte(manifestDesc), &desc); err != nil {
+		return nil, err
+	}
+	return &desc, nil
 }
 
 func prepareSyncedFiles(def *llb.Definition, localMounts map[string]fsutil.FS) (filesync.StaticDirSource, error) {
@@ -495,7 +557,7 @@ func prepareSyncedFiles(def *llb.Definition, localMounts map[string]fsutil.FS) (
 type cacheOptions struct {
 	options        controlapi.CacheOptions
 	contentStores  map[string]content.Store // key: ID of content store ("local:" + csDir)
-	storesToUpdate map[string]string        // key: path to content store, value: tag
+	storesToUpdate map[string]ociStore      // key: cache exporter ID
 	frontendAttrs  map[string]string
 }
 
@@ -505,7 +567,7 @@ func parseCacheOptions(ctx context.Context, isGateway bool, opt SolveOpt) (*cach
 		cacheImports []*controlapi.CacheOptionsEntry
 	)
 	contentStores := make(map[string]content.Store)
-	storesToUpdate := make(map[string]string)
+	storesToUpdate := make(map[string]ociStore)
 	frontendAttrs := make(map[string]string)
 	for _, ex := range opt.CacheExports {
 		if ex.Type == "local" {
@@ -526,8 +588,7 @@ func parseCacheOptions(ctx context.Context, isGateway bool, opt SolveOpt) (*cach
 			if t, ok := ex.Attrs["tag"]; ok {
 				tag = t
 			}
-			// TODO(AkihiroSuda): support custom index JSON path and tag
-			storesToUpdate[csDir] = tag
+			storesToUpdate[ex.id] = ociStore{path: csDir, tag: tag}
 		}
 		if ex.Type == "registry" {
 			regRef := ex.Attrs["ref"]
