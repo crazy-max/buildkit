@@ -3975,11 +3975,18 @@ func testMultipleExporters(t *testing.T, sb integration.Sandbox) {
 		Exports: exporters,
 	}, nil)
 	require.NoError(t, err)
+	require.Len(t, resp.ExporterResponses, len(exporters))
+	for i := range exporters {
+		require.NotNil(t, resp.ExporterResponseByID(strconv.Itoa(i)))
+	}
 
 	if workers.IsTestDockerd() {
 		require.Equal(t, target1+","+target2, resp.ExporterResponse[exptypes.ExporterImageNameKey])
+		require.Equal(t, target1+","+target2, resp.ExporterResponseByID("0").Data[exptypes.ExporterImageNameKey])
 	} else {
 		require.Equal(t, target2, resp.ExporterResponse[exptypes.ExporterImageNameKey])
+		require.Equal(t, target1, resp.ExporterResponseByID("0").Data[exptypes.ExporterImageNameKey])
+		require.Equal(t, target2, resp.ExporterResponseByID("1").Data[exptypes.ExporterImageNameKey])
 	}
 	require.FileExists(t, filepath.Join(destDir, "out.tar"))
 	require.FileExists(t, filepath.Join(destDir, "out2.tar"))
@@ -11491,6 +11498,12 @@ func testMultipleCacheExports(t *testing.T, sb integration.Sandbox) {
 		},
 	}, nil)
 	require.NoError(t, err)
+	require.Len(t, res.CacheExporterResponses, 4)
+	for i := 0; i < 4; i++ {
+		require.NotNil(t, res.CacheExporterResponseByID(strconv.Itoa(i)))
+	}
+	require.NotEmpty(t, res.CacheExporterResponseByID("0").Data["cache.manifest"])
+	require.NotEmpty(t, res.CacheExporterResponseByID("1").Data["cache.manifest"])
 
 	ensureFile(t, filepath.Join(cacheOutDir, ocispecs.ImageIndexFile))
 	ensureFile(t, filepath.Join(cacheOutDir2, ocispecs.ImageIndexFile))
