@@ -5,12 +5,14 @@ import (
 	"context"
 	io "io"
 	"os"
+	"path/filepath"
 	"time"
 
+	continuityfs "github.com/containerd/continuity/fs"
 	"github.com/moby/buildkit/util/bklog"
-
 	"github.com/pkg/errors"
 	"github.com/tonistiigi/fsutil"
+	fscopy "github.com/tonistiigi/fsutil/copy"
 	fstypes "github.com/tonistiigi/fsutil/types"
 	"google.golang.org/grpc"
 )
@@ -112,21 +114,22 @@ func recvDiffCopy(ds grpc.ClientStream, dest string, cu CacheUpdater, progress p
 }
 
 func syncTargetDiffCopy(ds grpc.ServerStream, dest string, mode FSSyncDirMode) error {
-	var merge bool
 	switch mode {
 	case "", FSSyncDirModeCopy:
-		merge = true
+		return syncTargetDiffCopyCopy(ds, dest)
 	case FSSyncDirModeDelete:
-		merge = false
+		return syncTargetDiffCopyDelete(ds, dest)
 	default:
 		return errors.Errorf("invalid local exporter mode %q", mode)
 	}
+}
 
+func syncTargetDiffCopyCopy(ds grpc.ServerStream, dest string) error {
 	if err := os.MkdirAll(dest, 0700); err != nil {
 		return errors.Wrapf(err, "failed to create synctarget dest dir %s", dest)
 	}
 	return errors.WithStack(fsutil.Receive(ds.Context(), ds, dest, fsutil.ReceiveOpt{
-		Merge: merge,
+		Merge: true,
 		Filter: func() func(string, *fstypes.Stat) bool {
 			uid := os.Getuid()
 			gid := os.Getgid()
@@ -137,6 +140,49 @@ func syncTargetDiffCopy(ds grpc.ServerStream, dest string, mode FSSyncDirMode) e
 			}
 		}(),
 	}))
+}
+
+func syncTargetDiffCopyDelete(ds grpc.ServerStream, dest string) error {
+	if err := os.MkdirAll(filepath.Dir(dest), 0700); err != nil {
+		return errors.Wrapf(err, "failed to create synctarget parent dir %s", filepath.Dir(dest))
+	}
+
+	stageDir, err := os.MkdirTemp(filepath.Dir(dest), ".buildkit-local-export-")
+	if err != nil {
+		return errors.Wrap(err, "failed to create synctarget staging dir")
+	}
+	defer os.RemoveAll(stageDir)
+
+	if err := syncTargetDiffCopyCopy(ds, stageDir); err != nil {
+		return err
+	}
+
+	if err := os.MkdirAll(dest, 0700); err != nil {
+		return errors.Wrapf(err, "failed to create synctarget dest dir %s", dest)
+	}
+
+	if err = continuityfs.Changes(ds.Context(), dest, stageDir, func(kind continuityfs.ChangeKind, p string, _ os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if kind != continuityfs.ChangeKindDelete {
+			return nil
+		}
+		if len(p) > 0 {
+			p = p[1:]
+		}
+		if p == "" {
+			return nil
+		}
+		return errors.WithStack(os.RemoveAll(filepath.Join(dest, p)))
+	}); err != nil {
+		return errors.WithStack(err)
+	}
+
+	return errors.WithStack(fscopy.Copy(ds.Context(), stageDir, ".", dest, ".", fscopy.WithCopyInfo(fscopy.CopyInfo{
+		CopyDirContents:                true,
+		AlwaysReplaceExistingDestPaths: true,
+	})))
 }
 
 func writeTargetFile(ds grpc.ServerStream, wc io.WriteCloser) error {
