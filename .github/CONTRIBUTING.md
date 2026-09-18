@@ -192,6 +192,25 @@ To generate new versions of automatically generated files run:
 $ make generated-files
 ```
 
+### Automated and AI-assisted contributions
+
+Pull requests must be opened by a human. Automation that opens pull requests
+requires prior maintainer approval.
+
+AI tools may assist with development, but the human contributor remains
+responsible for everything they submit. Contributors must understand and review
+AI-assisted changes, verify their correctness, run the relevant tests, and be
+able to explain the changes in their own words.
+
+Do not submit unreviewed AI-generated code, issues, documentation, security
+reports, pull request descriptions, or comments. Do not use AI to generate
+replies in code review or issue discussions. Avoid generated refactoring, style
+churn, or unrelated changes that increase the review burden.
+
+If AI generated a substantial portion of a contribution, disclose that in the
+pull request description. An optional `Assisted-by` commit trailer may identify
+the tool used.
+
 ### Pull requests are always welcome
 
 Not sure if that typo is worth a pull request? Found a bug and know how to fix
@@ -300,11 +319,22 @@ Then you just add a line to every git commit message:
 If you set your `user.name` and `user.email` git configs, you can sign your
 commit automatically with `git commit -s`.
 
+AI tools must not be listed in `Signed-off-by` or `Co-authored-by` trailers.
+Those trailers identify the humans or approved automation accounts responsible
+for the contribution.
+
 ### Conventions
 
+- Before starting work on an issue, check its linked pull requests and search
+  open pull requests to make sure the work is not already in progress.
 - Fork the repository and make changes on your fork in a feature branch
-- Submit tests for your changes. See [run the unit- and integration-tests](#run-the-unit--and-integration-tests)
+- Submit tests at the levels appropriate for your changes. See
+  [run the unit- and integration-tests](#run-the-unit--and-integration-tests)
   for details.
+- Run `make validate-all` and the tests covering your changes before opening or
+  updating a pull request.
+- Monitor the pull request's CI runs and address failures caused by your
+  changes.
 
 Update the documentation when creating or modifying features. Test your
 documentation changes for clarity, concision, and correctness, as well as a
