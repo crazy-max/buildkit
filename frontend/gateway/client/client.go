@@ -111,6 +111,16 @@ type Reference interface {
 	ReadDir(ctx context.Context, req ReadDirRequest) ([]*fstypes.Stat, error)
 }
 
+// ReferenceRegistrar can attach a reference's graph to its producing job without
+// evaluating it. Keep the producing job alive until consumers finish evaluating.
+// Registration may resolve source policies and import cache metadata, but does
+// not execute graph operations or materialize image layers.
+// Remote implementations require the gateway.register capability.
+type ReferenceRegistrar interface {
+	Reference
+	Register(ctx context.Context) error
+}
+
 type ReadRequest struct {
 	Filename string
 	Range    *FileRange

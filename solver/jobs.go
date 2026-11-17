@@ -29,6 +29,7 @@ import (
 type ResolveOpFunc func(Vertex, Builder) (Op, error)
 
 type Builder interface {
+	Load(ctx context.Context, e Edge) error
 	Build(ctx context.Context, e Edge) (CachedResultWithProvenance, error)
 	InContext(ctx context.Context, f func(ctx context.Context, jobCtx JobContext) error) error
 	EachValue(ctx context.Context, key string, fn func(any) error) error
@@ -396,6 +397,11 @@ type subBuilder struct {
 	*state
 	mu        sync.Mutex
 	exporters []ExportableCacheKey
+}
+
+func (sb *subBuilder) Load(ctx context.Context, e Edge) error {
+	_, err := sb.solver.load(ctx, e.Vertex, sb.vtx, nil)
+	return err
 }
 
 func (sb *subBuilder) Build(ctx context.Context, e Edge) (CachedResultWithProvenance, error) {
@@ -845,6 +851,23 @@ func (jl *Solver) deleteIfUnreferenced(k digest.Digest, st *state) {
 			WithField("jobs", jobIDs).
 			Debug("not deleting referenced active vertex")
 	}
+}
+
+// Load attaches a graph to the job without scheduling its operations.
+func (j *Job) Load(ctx context.Context, e Edge) error {
+	j.mu.Lock()
+	if j.discarded {
+		j.mu.Unlock()
+		return errors.Errorf("load on discarded job %s", j.id)
+	}
+	j.builds++
+	if span := trace.SpanFromContext(ctx); span.SpanContext().IsValid() {
+		j.span = span
+	}
+	j.mu.Unlock()
+	defer j.buildDone()
+	_, err := j.list.load(ctx, e.Vertex, nil, j)
+	return err
 }
 
 func (j *Job) Build(ctx context.Context, e Edge) (CachedResultWithProvenance, error) {

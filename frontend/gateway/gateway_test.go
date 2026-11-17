@@ -9,11 +9,43 @@ import (
 	gwclient "github.com/moby/buildkit/frontend/gateway/client"
 	"github.com/moby/buildkit/frontend/gateway/container"
 	gatewaypb "github.com/moby/buildkit/frontend/gateway/pb"
+	"github.com/moby/buildkit/solver"
 	spb "github.com/moby/buildkit/solver/pb"
 	"github.com/moby/buildkit/util/grpcerrors"
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
 )
+
+type registrationProxy struct {
+	solver.ResultProxy
+	registered bool
+	evaluated  bool
+}
+
+func (r *registrationProxy) Register(context.Context) error {
+	r.registered = true
+	return nil
+}
+
+func (r *registrationProxy) Result(context.Context) (solver.CachedResult, error) {
+	r.evaluated = true
+	return nil, errors.New("unexpected evaluation")
+}
+
+func TestRegisterOnly(t *testing.T) {
+	r := &registrationProxy{}
+	f := &llbBridgeForwarder{
+		callCtx: t.Context(),
+		refs:    map[string]solver.ResultProxy{"ref": r},
+	}
+	_, err := f.Evaluate(t.Context(), &gatewaypb.EvaluateRequest{Ref: "ref", RegisterOnly: true})
+	require.NoError(t, err)
+	require.True(t, r.registered)
+	require.False(t, r.evaluated)
+	_, err = f.Evaluate(t.Context(), &gatewaypb.EvaluateRequest{Ref: "missing", RegisterOnly: true})
+	require.Error(t, err)
+}
 
 func TestCheckSourceIsAllowed(t *testing.T) {
 	makeGatewayFrontend := func(sources []string) (*gatewayFrontend, error) {

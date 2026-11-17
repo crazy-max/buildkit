@@ -71,7 +71,12 @@ func (b *llbBridge) Warn(ctx context.Context, dgst digest.Digest, msg string, op
 	})
 }
 
-func (b *llbBridge) loadResult(ctx context.Context, def *pb.Definition, cacheImports []gw.CacheOptionsEntry, pol []*spb.Policy) (solver.CachedResultWithProvenance, error) {
+type preparedResult struct {
+	edge           solver.Edge
+	prunedCacheIDs *detectPrunedCacheID
+}
+
+func (b *llbBridge) prepareResult(ctx context.Context, def *pb.Definition, cacheImports []gw.CacheOptionsEntry, pol []*spb.Policy) (*preparedResult, error) {
 	w, err := b.resolveWorker()
 	if err != nil {
 		return nil, err
@@ -147,15 +152,19 @@ func (b *llbBridge) loadResult(ctx context.Context, def *pb.Definition, cacheImp
 		return nil, errors.Wrap(err, "failed to load LLB")
 	}
 
-	if len(dpc.ids) > 0 {
+	return &preparedResult{edge: edge, prunedCacheIDs: dpc}, nil
+}
+
+func (b *llbBridge) buildResult(ctx context.Context, p *preparedResult) (solver.CachedResultWithProvenance, error) {
+	if len(p.prunedCacheIDs.ids) > 0 {
 		if err := b.eachWorker(func(w worker.Worker) error {
-			return w.PruneCacheMounts(ctx, dpc.ids)
+			return w.PruneCacheMounts(ctx, p.prunedCacheIDs.ids)
 		}); err != nil {
 			return nil, err
 		}
 	}
 
-	res, err := b.builder.Build(ctx, edge)
+	res, err := b.builder.Build(ctx, p.edge)
 	if err != nil {
 		return nil, err
 	}

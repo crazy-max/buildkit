@@ -39,16 +39,18 @@ func workerRefResolver(refCfg cacheconfig.RefConfig, all bool, g session.Group) 
 }
 
 type resultProxy struct {
-	id         string
-	b          *provenanceBridge
-	req        frontend.SolveRequest
-	g          flightcontrol.Group[solver.CachedResult]
-	mu         sync.Mutex
-	released   bool
-	v          solver.CachedResult
-	err        error
-	execErrors []*llberrdefs.ExecError
-	provenance *provenance.Capture
+	prepareGroup flightcontrol.Group[*preparedResult]
+	prepared     *preparedResult
+	id           string
+	b            *provenanceBridge
+	req          frontend.SolveRequest
+	g            flightcontrol.Group[solver.CachedResult]
+	mu           sync.Mutex
+	released     bool
+	v            solver.CachedResult
+	err          error
+	execErrors   []*llberrdefs.ExecError
+	provenance   *provenance.Capture
 }
 
 func newResultProxy(b *provenanceBridge, req frontend.SolveRequest) *resultProxy {
@@ -115,7 +117,11 @@ func (rp *resultProxy) wrapError(err error) error {
 }
 
 func (rp *resultProxy) loadResult(ctx context.Context) (solver.CachedResultWithProvenance, error) {
-	res, err := rp.b.loadResult(ctx, rp.req.Definition, rp.req.CacheImports, rp.req.SourcePolicies)
+	p, err := rp.prepare(ctx)
+	if err != nil {
+		return nil, err
+	}
+	res, err := rp.b.buildResult(ctx, p)
 	var ee *llberrdefs.ExecError
 	if errors.As(err, &ee) {
 		rp.mu.Lock()
@@ -127,6 +133,41 @@ func (rp *resultProxy) loadResult(ctx context.Context) (solver.CachedResultWithP
 		rp.mu.Unlock()
 	}
 	return res, err
+}
+
+func (rp *resultProxy) prepare(ctx context.Context) (*preparedResult, error) {
+	return rp.prepareGroup.Do(ctx, "prepare", func(ctx context.Context) (*preparedResult, error) {
+		rp.mu.Lock()
+		if rp.released {
+			rp.mu.Unlock()
+			return nil, errors.New("accessing released result")
+		}
+		p := rp.prepared
+		rp.mu.Unlock()
+		if p != nil {
+			return p, nil
+		}
+		p, err := rp.b.prepareResult(ctx, rp.req.Definition, rp.req.CacheImports, rp.req.SourcePolicies)
+		if err != nil {
+			return nil, err
+		}
+		rp.mu.Lock()
+		defer rp.mu.Unlock()
+		if rp.released {
+			return nil, errors.New("accessing released result")
+		}
+		rp.prepared = p
+		return p, nil
+	})
+}
+
+// Register attaches the result's graph to its job without evaluating it.
+func (rp *resultProxy) Register(ctx context.Context) error {
+	p, err := rp.prepare(ctx)
+	if err != nil {
+		return rp.wrapError(err)
+	}
+	return rp.wrapError(rp.b.builder.Load(ctx, p.edge))
 }
 
 func (rp *resultProxy) Result(ctx context.Context) (res solver.CachedResult, err error) {

@@ -66,6 +66,9 @@ const (
 
 	CapGatewayEvaluate apicaps.CapID = "gateway.evaluate"
 
+	// CapGatewayRegister registers a result's graph and session without evaluation.
+	CapGatewayRegister apicaps.CapID = "gateway.register"
+
 	// CapGatewayWarnings is the capability to log warnings from frontend
 	CapGatewayWarnings apicaps.CapID = "gateway.warnings"
 
@@ -85,6 +88,11 @@ const (
 )
 
 func init() {
+	Caps.Init(apicaps.Cap{
+		ID:      CapGatewayRegister,
+		Enabled: true,
+		Status:  apicaps.CapStatusExperimental,
+	})
 	Caps.Init(apicaps.Cap{
 		ID:      CapSolveBase,
 		Enabled: true,

@@ -21,8 +21,36 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
+	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/sync/errgroup"
 )
+
+func TestLoadRegistersGraphWithoutExecution(t *testing.T) {
+	var resolved atomic.Int64
+	s := NewSolver(SolverOpt{ResolveOpFunc: func(v Vertex, b Builder) (Op, error) {
+		resolved.Add(1)
+		return testOpResolver(v, b)
+	}})
+	defer s.Close()
+	j, err := s.NewJob("registration")
+	require.NoError(t, err)
+	defer j.Discard()
+	sc := trace.NewSpanContext(trace.SpanContextConfig{
+		TraceID: trace.TraceID{1},
+		SpanID:  trace.SpanID{2},
+	})
+	ctx := trace.ContextWithSpanContext(t.Context(), sc)
+	e := Edge{Vertex: vtx(vtxOpt{name: "registered", value: "unused"})}
+	require.NoError(t, j.Load(ctx, e))
+	require.Zero(t, resolved.Load())
+	st := s.actives[e.Vertex.Digest()]
+	require.NotNil(t, st)
+	require.NotNil(t, st.mspan.Span)
+	require.Equal(t, sc, st.mspan.SpanContext())
+	require.NoError(t, j.Discard())
+	require.Empty(t, s.actives)
+	require.Error(t, j.Load(ctx, e))
+}
 
 func init() {
 	if debugScheduler {

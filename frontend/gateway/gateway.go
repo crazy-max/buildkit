@@ -1087,6 +1087,20 @@ func (lbf *llbBridgeForwarder) StatFile(ctx context.Context, req *pb.StatFileReq
 
 func (lbf *llbBridgeForwarder) Evaluate(ctx context.Context, req *pb.EvaluateRequest) (*pb.EvaluateResponse, error) {
 	ctx = tracing.ContextWithSpanFromContext(ctx, lbf.callCtx)
+	if req.RegisterOnly {
+		lbf.mu.Lock()
+		ref, ok := lbf.refs[req.Ref]
+		lbf.mu.Unlock()
+		if !ok {
+			return nil, errors.Errorf("no such reference: %s", req.Ref)
+		}
+		if ref != nil {
+			if err := ref.Register(ctx); err != nil {
+				return nil, err
+			}
+		}
+		return &pb.EvaluateResponse{}, nil
+	}
 
 	_, err := lbf.getImmutableRef(ctx, req.Ref)
 	if err != nil {

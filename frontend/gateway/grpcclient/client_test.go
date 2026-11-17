@@ -13,6 +13,33 @@ import (
 	"google.golang.org/grpc"
 )
 
+type registrationClient struct {
+	pb.LLBBridgeClient
+	request *pb.EvaluateRequest
+}
+
+func (c *registrationClient) Evaluate(ctx context.Context, req *pb.EvaluateRequest, opts ...grpc.CallOption) (*pb.EvaluateResponse, error) {
+	c.request = req
+	return &pb.EvaluateResponse{}, nil
+}
+
+func TestRegisterReference(t *testing.T) {
+	t.Run("supported", func(t *testing.T) {
+		transport := &registrationClient{}
+		r := &reference{id: "ref", c: &grpcClient{client: transport, caps: pb.Caps.CapSet(pb.Caps.All())}}
+		require.NoError(t, r.Register(t.Context()))
+		require.NotNil(t, transport.request)
+		require.Equal(t, "ref", transport.request.Ref)
+		require.True(t, transport.request.RegisterOnly)
+	})
+	t.Run("unsupported", func(t *testing.T) {
+		transport := &registrationClient{}
+		r := &reference{id: "ref", c: &grpcClient{client: transport, caps: pb.Caps.CapSet(nil)}}
+		require.Error(t, r.Register(t.Context()))
+		require.Nil(t, transport.request, "old servers must not receive an evaluation request")
+	})
+}
+
 // blockedSendStream is an ExecProcess stream whose Send waits for flow-control
 // credit that never arrives until release is closed, while Recv keeps
 // delivering server messages.
